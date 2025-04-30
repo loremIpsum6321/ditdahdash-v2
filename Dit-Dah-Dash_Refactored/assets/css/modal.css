@@ -1,0 +1,219 @@
+/* Dit-Dah-Dash_Refactored/assets/css/modal.css */
+
+/**
+ * css/modal.css
+ * -------------
+ * Styling for the draggable settings modal window and its internal components.
+ * Merged from original modal.css and relevant styles from style.css.
+ * Ensures theme variables are applied.
+ */
+
+ .modal {
+    position: fixed;
+    /* Initial position set via JS ('left: 50%', 'top: 50%', 'transform: translate(-50%, -50%)') */
+    /* or set directly to pixel values after dragging */
+    width: 90%;
+    /* --- Widen modal --- */
+    max-width: 550px; /* Increased from 420px */
+    background-color: var(--container-bg);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: var(--overlay-shadow);
+    z-index: 1000; /* Ensure modal is above everything else */
+    overflow: hidden; /* Header/Content manage their own overflow */
+    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+    /* Visibility handled by adding/removing .hidden class */
+}
+
+.modal.hidden {
+    display: none;
+}
+
+.modal-header {
+    padding: 10px 15px;
+    /* Use a distinct background, like input area bg */
+    background-color: var(--input-area-bg);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: move; /* Indicate draggable */
+    user-select: none; /* Prevent text selection on header */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.modal-title {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: inherit; /* Inherit from modal header */
+    pointer-events: none; /* Prevent title interfering with drag */
+}
+
+.modal-close-button {
+    background: none;
+    border: none;
+    font-size: 1.8em;
+    line-height: 1;
+    color: var(--text-color); /* Use modal text color */
+    cursor: pointer;
+    padding: 0 5px;
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+    margin-left: 10px; /* Ensure some space */
+}
+
+.modal-close-button:hover {
+    opacity: 1;
+}
+
+.modal-content {
+    padding: 15px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px; /* Increase gap slightly */
+    color: inherit; /* Inherit text color from modal */
+    max-height: calc(80vh - 60px); /* Limit height based on viewport, accounting for header */
+    /* --- Disable scrolling --- */
+    overflow-y: hidden; /* Changed from 'auto' to 'hidden' */
+}
+
+/* --- Styles for elements inside modal content --- */
+
+/* Labels */
+.modal-content label {
+    /* Generic label style within modal */
+    width: 100%;
+    display: flex;
+    justify-content: space-between; /* Pushes value display/control to right */
+    align-items: center;
+    font-size: 1.1em;
+    margin-bottom: -8px; /* Pull controls slightly closer */
+    color: inherit; /* Inherit from modal */
+}
+.modal-content label > span:last-of-type { /* Target value displays */
+    font-weight: bold;
+}
+
+/* Range Sliders (WPM, Frequency) */
+.modal-content input[type="range"] {
+    width: 100%;
+    cursor: pointer;
+    accent-color: var(--button-primary-bg); /* Use theme color for track fill */
+    height: 8px; /* Explicit height */
+    background: var(--volume-slider-track-bg); /* Use consistent track bg */
+    border-radius: 4px;
+    appearance: none;
+    -webkit-appearance: none;
+    margin-top: 5px; /* Add some space above slider */
+}
+/* Consistent thumb styling */
+.modal-content input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 18px; height: 18px; background: var(--volume-slider-thumb-bg); border-radius: 50%; border: var(--volume-slider-thumb-border); cursor: pointer; margin-top: -5px;
+}
+.modal-content input[type="range"]::-moz-range-thumb {
+    width: 18px; height: 18px; background: var(--volume-slider-thumb-bg); border-radius: 50%; border: var(--volume-slider-thumb-border); cursor: pointer;
+}
+/* ... potentially add -ms-thumb */
+
+/* Toggle Rows (Sound, Dark Mode) */
+.modal-content .settings-toggle-row {
+     width: 100%;
+     display: flex;
+     justify-content: space-between; /* Label left, toggle right */
+     align-items: center;
+     margin-top: 5px; /* Space above toggle rows */
+}
+.modal-content .settings-toggle-row label {
+    margin-bottom: 0; /* Remove default label margin */
+    width: auto; /* Don't force label to 100% width */
+    color: inherit;
+}
+.modal-content input[type="checkbox"] {
+    transform: scale(1.4); /* Make checkbox slightly larger */
+    cursor: pointer;
+    accent-color: var(--button-primary-bg); /* Use theme color for check */
+    margin-left: 10px; /* Space between label and toggle */
+}
+
+/* Key Mapping Row */
+.modal-content .key-mapping-row {
+    display: flex;
+    justify-content: flex-start; /* Align items to the start */
+    align-items: center;
+    gap: 15px; /* Space between label and input */
+    width: 100%;
+}
+/* Key mapping specific label style */
+.modal-content .key-mapping-row label {
+    width: auto !important; /* Override general label width */
+    display: inline !important;
+    flex-shrink: 0;
+    margin-bottom: 0;
+    min-width: 70px; /* Align labels */
+    text-align: right; /* Right-align label text */
+    justify-content: flex-end; /* Ensure label text aligns right */
+}
+/* Key Input Box */
+.modal-content .key-input {
+    padding: 6px 10px;
+    font-family: 'Roboto Mono', monospace;
+    font-size: 1em;
+    text-align: center;
+    border: 1px solid var(--key-input-border);
+    border-radius: 4px;
+    background-color: var(--key-input-bg);
+    color: var(--text-color);
+    width: 90px; /* Fixed width */
+    cursor: pointer;
+    transition: border-color 0.2s ease, background-color 0.3s ease, color 0.3s ease;
+    text-transform: uppercase;
+}
+.modal-content .key-input:focus {
+    outline: none;
+    border-color: var(--key-input-focus-border);
+    box-shadow: 0 0 0 2px var(--button-primary-hover-bg);
+}
+.modal-content .key-input.listening {
+    font-style: italic;
+    opacity: 0.8;
+}
+
+/* Buttons (Reset Progress) */
+.modal-content button { /* Target buttons directly inside modal content */
+    width: 100%; /* Full width button */
+    padding: 10px 15px;
+    /* Use specific theme button variables if needed, or defaults */
+    background-color: var(--button-reset-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1.1em;
+    transition: background-color 0.2s ease, color 0.3s ease, border-color 0.3s ease;
+    margin-top: 15px; /* Add margin above buttons */
+}
+.modal-content button:hover {
+    background-color: var(--button-reset-hover-bg);
+}
+
+/* Specific button styling (Reset Progress) */
+.modal-content #reset-progress-button {
+    background-color: var(--char-incorrect-bg); /* Use incorrect/warning color */
+    color: var(--char-incorrect-color); /* Use corresponding text color */
+    border: none; /* Remove border for colored button */
+}
+.modal-content #reset-progress-button:hover {
+    filter: brightness(0.9);
+    background-color: var(--char-incorrect-bg); /* Keep background on hover */
+}
+
+/* Ensure children don't overflow */
+.modal-content > * {
+     max-width: 100%;
+}

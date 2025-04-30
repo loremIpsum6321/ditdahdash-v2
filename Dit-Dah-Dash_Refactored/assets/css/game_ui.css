@@ -1,0 +1,366 @@
+/* Dit-Dah-Dash_Refactored/assets/css/game_ui.css */
+
+/**
+ * css/game_ui.css
+ * ---------------
+ * Styles specific to the core game interface elements:
+ * sentence display, pattern displays, feedback, hint toggle,
+ * paddle buttons, and volume controls.
+ * Extracted from the original style.css.
+ */
+
+
+/* --- Game Mode UI Wrapper (Contains game elements) --- */
+#game-ui-wrapper {
+    display: flex;
+    flex-direction: column; /* Stack children vertically */
+    width: 100%;
+    height: 100%;
+    overflow: hidden; /* Prevent content overflow */
+    position: relative; /* For absolute positioned children */
+}
+
+/* Spacer element used to push text display down */
+#top-spacer {
+    height: 70px; /* Approximate height of patterns + volume + margins */
+    flex-shrink: 0; /* Prevent it from shrinking */
+    width: 100%;   /* Take full width */
+    /* background-color: rgba(255, 0, 0, 0.1); /* Optional: for debugging layout */
+}
+
+
+/* --- Input Buttons / Paddles --- */
+#input-area .morse-button { /* Target paddles specifically within input-area */
+    flex-grow: 1; /* Paddles share space */
+    flex-basis: 45%; /* Start around 45% width */
+    max-width: 48%; /* Limit max width */
+    font-weight: bold;
+    border: none;
+    border-radius: 15px;
+    cursor: pointer;
+    color: var(--button-text-color);
+    box-shadow: var(--button-shadow);
+    transition: background-color 0.1s ease, transform 0.05s ease, box-shadow 0.1s ease, border 0.2s ease, background-image 0.2s ease;
+    /* Flexbox centering for content (SVG + Label) */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    user-select: none; /* Prevent text selection */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    height: 100%; /* Fill vertical space in input-area */
+    padding: 10px;
+    overflow: hidden; /* Hide texture overflow */
+    position: relative; /* For label positioning */
+
+    /* Texture Properties */
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+/* Drag-over indication */
+#input-area .morse-button.drag-over {
+    border: var(--paddle-drag-over-border);
+    filter: brightness(1.1);
+}
+
+/* Ensure SVG/Label are visible over texture */
+#input-area .morse-button .paddle-svg,
+#input-area .morse-button .paddle-label {
+    position: relative;
+    z-index: 1;
+}
+
+/* Hide SVG when results label is active (class added by JS) */
+#input-area .morse-button.results-label-active .paddle-svg {
+    display: none;
+}
+/* Default state for SVG */
+#input-area .morse-button .paddle-svg {
+    width: 20%;
+    max-height: 40%;
+    min-height: 25px; /* Ensure visibility */
+    fill: currentColor; /* Inherit color (usually button text color) */
+    pointer-events: none; /* SVG shouldn't capture events */
+    flex-shrink: 0;
+    transition: display 0s; /* Instant show/hide */
+}
+
+/* Specific paddle SVG adjustments */
+#dah-button .paddle-svg {
+    max-height: 45%;
+    width: 24%; /* Slightly wider */
+}
+
+/* Paddle label styling */
+#input-area .paddle-label {
+    font-size: 1.6em; /* Default size (large for results mode) */
+    color: var(--paddle-label-color);
+    text-align: center;
+    white-space: nowrap;
+    min-height: 1.2em; /* Reserve space when empty */
+    width: 100%;
+    transition: color 0.3s ease;
+    margin-top: 5px; /* Space between SVG (if visible) and label */
+}
+/* Style for results paddle label */
+#input-area .morse-button.results-label-active .paddle-label {
+    font-weight: bold;
+    font-style: italic;
+    color: var(--paddle-label-results-color);
+    font-size: 1.8em; /* Even larger for results */
+    margin-top: 0; /* No margin needed when SVG is hidden */
+}
+/* Base Background Colors (used when NO texture applied) */
+#dit-button { background-color: var(--button-dit-bg); }
+#dah-button { background-color: var(--button-dah-bg); }
+
+/* Active/Pressed state */
+#input-area .morse-button:active,
+#input-area .morse-button.active {
+    transform: scale(0.97);
+    box-shadow: var(--button-active-shadow);
+    filter: brightness(0.9);
+}
+/* Disabled state */
+#input-area .morse-button:disabled {
+    filter: grayscale(60%);
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+#input-area .morse-button:disabled .paddle-label {
+    color: #aaa; /* Dim label when disabled */
+}
+
+
+/* --- Text Display (Sentence) --- */
+#text-display-wrapper {
+    display: flex;
+    align-items: center; /* Vertically center text line */
+    padding: 10px 0; /* Vertical padding, horizontal handled by #text-display padding */
+    overflow-x: hidden; /* Hide horizontal scrollbar */
+    overflow-y: hidden; /* Hide vertical scrollbar */
+    line-height: 1.3; /* Adjust line height */
+    width: 100%; /* Take full width */
+    max-width: 98%; /* Small horizontal margin */
+    margin: 5px auto; /* Center wrapper */
+    border: var(--text-display-border);
+    border-radius: 8px;
+    background-color: var(--text-display-wrapper-bg);
+    cursor: default; /* Indicate text isn't directly interactive */
+    flex-grow: 1; /* Allow wrapper to take available vertical space */
+    min-height: 100px; /* Ensure minimum height */
+    flex-shrink: 1; /* Allow shrinking */
+}
+#text-display {
+    font-size: 4em; /* Base font size */
+    white-space: nowrap; /* Keep sentence on one line */
+    text-align: left;
+    width: max-content; /* Allow content to determine width */
+    max-width: none;
+    /* Padding allows first/last characters to be centered */
+    padding-left: 50%;
+    padding-right: 50%;
+    will-change: transform; /* Hint for scroll animation */
+}
+/* Individual character spans */
+.char {
+    display: inline-block; /* Allow background/padding */
+    transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease; /* Added box-shadow transition */
+    border-radius: 3px;
+    padding: 0 0.05em; /* Minimal horizontal padding */
+    margin: 0 0.02em; /* Minimal horizontal margin */
+    vertical-align: middle; /* Align characters nicely */
+    border: 1px solid transparent; /* Add transparent border for spacing consistency */
+}
+.char.pending { color: var(--char-pending-color); }
+/* --- Fix: Ensure current character box shadow is visible --- */
+.char.current {
+    background-color: var(--char-current-bg);
+    color: var(--char-current-color);
+    /* Use border instead of box-shadow for better visibility */
+    border: 2px solid var(--char-current-shadow);
+    /* Or if using box-shadow, ensure spread/offset: */
+    /* box-shadow: 0 0 0 2px var(--char-current-shadow); */
+    font-weight: bold;
+    padding: 0 0.03em; /* Adjust padding slightly if using border */
+    margin: 0; /* Adjust margin slightly if using border */
+}
+.char.completed { color: var(--char-completed-color); font-weight: bold; border-color: transparent;} /* Reset border for completed */
+.char.incorrect { color: var(--char-incorrect-color); background-color: var(--char-incorrect-bg); animation: shake 0.3s ease-in-out; border-color: transparent; } /* Reset border for incorrect */
+@keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+.char.space { display: inline-block; min-width: 0.4em; border-color: transparent; } /* Visual space for space chars */
+
+/* --- Pattern Displays (Target/Hint and User Input) --- */
+#target-pattern-outer-wrapper {
+    position: relative; /* For hint toggle positioning */
+    width: 95%;
+    max-width: 550px;
+    margin: 10px auto 5px auto; /* Spacing */
+    flex-shrink: 0; /* Prevent shrinking */
+}
+.pattern-container { /* Shared style for target and user */
+    width: 100%;
+    min-height: 55px;
+    padding: 8px 12px;
+    background-color: var(--pattern-bg);
+    border-radius: 8px;
+    display: flex;
+    justify-content: center; /* Center SVGs */
+    align-items: center; /* Center SVGs vertically */
+    gap: 6px;
+    transition: background-color 0.15s ease-in-out;
+    position: relative;
+}
+#user-pattern-container {
+    margin: 5px auto 5px auto; /* Spacing */
+    flex-shrink: 0;
+    width: 95%;
+    max-width: 550px;
+}
+
+/* Base SVG styles within pattern containers */
+.pattern-container svg {
+    width: 28px;
+    height: 28px;
+    fill: var(--pattern-svg-fill);
+    transition: fill 0.15s ease-in-out, visibility 0s, transform 0.3s ease-in-out;
+}
+.pattern-container svg.pattern-dah {
+    width: 42px; /* Wider for Dah */
+}
+
+/* Feedback States for Pattern Containers */
+/* CORRECT */
+.pattern-container.correct-pattern { background-color: var(--pattern-correct-bg); }
+.pattern-container.correct-pattern svg { fill: var(--pattern-correct-fill); }
+/* INCORRECT */
+.pattern-container.incorrect-pattern { background-color: var(--pattern-incorrect-bg); }
+.pattern-container.incorrect-pattern svg { fill: var(--pattern-incorrect-fill); }
+
+/* Hint Pulse Animation (defined once) */
+@keyframes svg-pulse-animation {
+    0% { transform: scale(1); fill: var(--pattern-svg-fill); }
+    50% { transform: scale(1.1); fill: var(--pattern-pulse-color); }
+    100% { transform: scale(1); fill: var(--pattern-svg-fill); }
+}
+/* Apply animation to SVGs inside the target container when class is added */
+#target-pattern-container svg.hint-svg-pulse {
+    animation: svg-pulse-animation var(--hint-pulse-animation-duration) ease-in-out infinite;
+}
+
+/* Hint Visibility Toggle Button and State */
+.hint-toggle {
+    position: absolute;
+    top: 50%;
+    right: 5px;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    padding: 0 3px;
+    cursor: pointer;
+    color: var(--hint-toggle-color);
+    line-height: 0; /* Prevent extra height */
+    transition: color 0.2s ease;
+    z-index: 5; /* Above pattern SVGs */
+}
+.hint-toggle:hover { color: var(--hint-toggle-hover-color); }
+.hint-toggle svg { width: 1.4em; height: 1.4em; stroke: currentColor; vertical-align: middle; }
+/* Show the correct icon based on hint state */
+#target-pattern-outer-wrapper > .hint-toggle > svg { display: none; }
+#target-pattern-outer-wrapper:not(.hint-hidden) > .hint-toggle > svg.icon-visible { display: inline-block; }
+#target-pattern-outer-wrapper.hint-hidden > .hint-toggle > svg.icon-hidden { display: inline-block; }
+/* Hide the SVGs inside the pattern container when hint is hidden */
+#target-pattern-outer-wrapper.hint-hidden #target-pattern-container svg { visibility: hidden; }
+
+
+/* --- Volume Control Area --- */
+#volume-control-area {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    width: 60%;
+    max-width: 350px;
+    margin: 5px auto 10px auto; /* Center horizontally, space vertically */
+    padding: 5px;
+    flex-shrink: 0; /* Prevent shrinking */
+}
+#volume-slider {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 100%;
+    height: 10px;
+    background: var(--volume-slider-track-bg);
+    border-radius: 5px;
+    cursor: pointer;
+    flex-grow: 1; /* Take available space */
+    order: 1; /* Slider first */
+}
+#volume-slider::-webkit-slider-thumb { appearance: none; -webkit-appearance: none; width: 20px; height: 20px; background: var(--volume-slider-thumb-bg); border-radius: 50%; border: var(--volume-slider-thumb-border); cursor: pointer; margin-top: -5px; /* Center thumb vertically */ }
+#volume-slider::-moz-range-thumb { width: 20px; height: 20px; background: var(--volume-slider-thumb-bg); border-radius: 50%; border: var(--volume-slider-thumb-border); cursor: pointer; }
+#volume-slider::-ms-thumb { width: 20px; height: 20px; background: var(--volume-slider-thumb-bg); border-radius: 50%; border: var(--volume-slider-thumb-border); cursor: pointer; margin-top: 0px; }
+#volume-slider::-webkit-slider-runnable-track { width: 100%; height: 10px; background: var(--volume-slider-track-bg); border-radius: 5px; }
+#volume-slider::-moz-range-track { width: 100%; height: 10px; background: var(--volume-slider-track-bg); border-radius: 5px; }
+#volume-slider::-ms-track { width: 100%; height: 10px; background: transparent; border-color: transparent; color: transparent; }
+#volume-slider::-ms-fill-lower, #volume-slider::-ms-fill-upper { background: var(--volume-slider-track-bg); border-radius: 5px; }
+
+#speaker-icon {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    order: 2; /* Speaker second */
+}
+#speaker-icon svg {
+    width: 100%;
+    height: 100%;
+    stroke: var(--speaker-icon-color);
+    transition: stroke 0.3s ease;
+    display: block;
+    overflow: visible;
+}
+/* Waves hidden by default, shown by JS */
+#speaker-icon svg path[id^="speaker-wave-"] { transition: display 0s; }
+
+
+/* --- Stats Display (Hidden in Game Mode) --- */
+#stats-display {
+    display: none; /* Hidden during active gameplay */
+    /* Styles below would apply if it were shown */
+    /* width: 100%; padding: 8px 0; background-color: var(--stats-bg); border-top: var(--stats-border);
+    text-align: center; font-size: 1.2em; color: var(--stats-color); display: flex; justify-content: space-around;
+    flex-wrap: wrap; gap: 5px 15px; flex-shrink: 0; */
+}
+/* #stats-display > div { background-color: var(--pattern-bg); padding: 4px 8px; border-radius: 4px; } */
+
+
+/* --- Responsive Adjustments for Game UI --- */
+@media screen and (orientation: landscape) and (max-height: 500px) {
+    #top-spacer { display: none;} /* Remove spacer in landscape */
+    #text-display-wrapper { padding: 5px 0; line-height: 1.2; min-height: 60px; }
+    #target-pattern-outer-wrapper, #user-pattern-container { width: 90%; max-width: 400px; margin: 4px auto; }
+    .pattern-container { min-height: 40px; padding: 3px 8px; gap: 3px; }
+    .pattern-container svg { width: 20px; height: 20px; }
+    .pattern-container svg.pattern-dah { width: 30px; }
+    .hint-toggle svg { width: 1.2em; height: 1.2em; }
+    .hint-toggle { right: 2px; padding: 0 2px; }
+    #input-area .morse-button .paddle-svg { min-height: 10px; }
+    #input-area .paddle-label { font-size: 0.8em; margin-top: 3px;}
+    #input-area .morse-button.results-label-active .paddle-label { font-size: 1.5em; margin-top: 0;}
+}
+
+@media (max-width: 360px) {
+    #top-spacer { display: none; } /* Remove spacer on small screens */
+    #text-display { font-size: 3.5em; }
+    #target-pattern-outer-wrapper, #user-pattern-container { width: 95%; max-width: none; }
+    .pattern-container svg { width: 24px; height: 24px; }
+    .pattern-container svg.pattern-dah { width: 36px; }
+    .pattern-container { min-height: 50px; gap: 4px; }
+    #volume-control-area { width: 70%; max-width: 250px; gap: 10px; margin: 3px auto 5px auto; }
+    #volume-slider { height: 8px; }
+    #volume-slider::-webkit-slider-thumb, #volume-slider::-moz-range-thumb, #volume-slider::-ms-thumb { width: 16px; height: 16px; margin-top: -4px; }
+    #speaker-icon { width: 28px; height: 28px; }
+}

@@ -1,0 +1,174 @@
+/* Dit-Dah-Dash_Refactored/assets/css/themes.css */
+
+/**
+ * css/themes.css
+ * --------------
+ * Contains CSS variables for light and dark themes.
+ * Extracted from the original style.css.
+ */
+
+ :root {
+    /* Light Mode Variables */
+    --bg-color: #f0f0f0;
+    --text-color: #333;
+    --container-bg: #ffffff;
+    --border-color: #cccccc;
+    --input-area-bg: #e0e0e0; /* Also used for modal header */
+    --button-dit-bg: #2196F3;
+    --button-dah-bg: #ff9800;
+    --button-text-color: white;
+    --button-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    --button-active-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    --pattern-bg: #eeeeee;
+    --pattern-svg-fill: #555555; /* Default SVG fill */
+    --pattern-correct-bg: #c8e6c9; /* Green background for correct */
+    --pattern-correct-fill: #1b5e20; /* Darker green for correct SVG */
+    --pattern-incorrect-bg: #ffcdd2; /* Red background for incorrect */
+    --pattern-incorrect-fill: #c62828; /* Darker red for incorrect SVG */
+    --pattern-pulse-color: #333333; /* Darker color for pulsing SVG in light mode */
+    --text-display-wrapper-bg: #fdfdfd;
+    --text-display-border: 1px solid #eee;
+    --char-pending-color: var(--text-color);
+    --char-current-bg: #fff59d; /* Yellow */
+    --char-current-color: #000;
+    --char-current-shadow: 0 0 0 2px #fdd835;
+    --char-completed-color: #4CAF50; /* Green */
+    --char-incorrect-bg: #f44336; /* Red */
+    --char-incorrect-color: white;
+    --stats-color: #555; /* Used in results UI */
+    --playback-input-bg: white;
+    --playback-input-border: 1px solid #ccc;
+    --playback-morse-bg: #f8f8f8;
+    --playback-morse-color: #666;
+    --button-primary-bg: #2196F3; /* Blue */
+    --button-primary-hover-bg: #1976D2;
+    --button-secondary-bg: #aaa; /* Grey */
+    --button-secondary-hover-bg: #888;
+    --button-success-bg: #4CAF50; /* Green */
+    --button-success-hover-bg: #388E3C;
+    --button-reset-bg: #e0e0e0; /* Light Grey */
+    --button-reset-hover-bg: #d5d5d5;
+    --overlay-bg: rgba(255, 255, 255, 0.98);
+    --overlay-shadow: 0 0 20px rgba(0,0,0,0.1);
+    --level-button-bg: #e0e0e0;
+    --level-button-color: #333;
+    --level-button-hover-bg: #d5d5d5;
+    --level-locked-bg: #f5f5f5;
+    --level-locked-color: #aaa;
+    --level-unlocked-bg: #a5d6a7; /* Light Green */
+    --level-unlocked-color: #1b5e20;
+    --level-unlocked-hover-bg: #81c784;
+    --level-completed-bg: #fff59d; /* Yellow */
+    --level-completed-color: #3e2723; /* Brownish */
+    --level-completed-hover-bg: #ffee58;
+    --hint-toggle-color: #888;
+    --hint-toggle-hover-color: #555;
+    --menu-nav-button-bg: rgba(180, 180, 180, 0.7);
+    --menu-nav-button-hover-bg: rgba(150, 150, 150, 0.9);
+    --menu-nav-button-color: #333;
+    --paddle-label-color: #444;
+    --paddle-label-results-color: var(--button-text-color); /* Use button text color for results label */
+    --star-empty-color: #ccc;
+    --star-filled-color: #ffc107; /* Gold */
+    --volume-slider-track-bg: #ccc;
+    --volume-slider-thumb-bg: #555;
+    --volume-slider-thumb-border: 2px solid var(--container-bg);
+    --speaker-icon-color: var(--hint-toggle-color);
+    --paddle-drag-over-border: 3px dashed var(--button-primary-hover-bg);
+    --key-input-bg: #f8f8f8;
+    --key-input-border: #ccc;
+    --key-input-focus-border: var(--button-primary-bg);
+    --hint-pulse-animation-duration: 1.5s; /* Duration for one pulse */
+}
+
+.dark-mode {
+    /* Dark Mode Variables */
+    --bg-color: #212121;
+    --text-color: #e0e0e0;
+    --container-bg: #333333;
+    --border-color: #555555;
+    --input-area-bg: #424242; /* Also used for modal header */
+    --button-dit-bg: #03A9F4; /* Lighter Blue */
+    --button-dah-bg: #FFC107; /* Yellow/Orange */
+    --button-text-color: #212121; /* Dark text on light buttons */
+    --button-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+    --button-active-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+    --pattern-bg: #444444;
+    --pattern-svg-fill: #bbbbbb; /* Default SVG fill */
+    --pattern-correct-bg: #2e7d32; /* Dark green background for correct */
+    --pattern-correct-fill: #a5d6a7; /* Light green for correct SVG */
+    --pattern-incorrect-bg: #D32F2F; /* Dark red background for incorrect */
+    --pattern-incorrect-fill: #ffcdd2; /* Light red for incorrect SVG */
+    --pattern-pulse-color: #eeeeee; /* Lighter color for pulsing SVG in dark mode */
+    --text-display-wrapper-bg: #2a2a2a;
+    --text-display-border: 1px solid #444;
+    --char-pending-color: var(--text-color);
+    --char-current-bg: #5c6bc0; /* Indigo */
+    --char-current-color: #e8eaf6;
+    --char-current-shadow: 0 0 0 2px #7986cb;
+    --char-completed-color: #81C784; /* Light Green */
+    --char-incorrect-bg: #ef5350; /* Lighter Red */
+    --char-incorrect-color: white;
+    --stats-color: #bdbdbd; /* Used in results UI */
+    --playback-input-bg: #555;
+    --playback-input-border: 1px solid #777;
+    --playback-morse-bg: #444;
+    --playback-morse-color: #ccc;
+    --button-primary-bg: #03A9F4; /* Light Blue */
+    --button-primary-hover-bg: #29B6F6;
+    --button-secondary-bg: #757575; /* Mid Grey */
+    --button-secondary-hover-bg: #9E9E9E;
+    --button-success-bg: #66BB6A; /* Light Green */
+    --button-success-hover-bg: #81C784;
+    --button-reset-bg: #616161; /* Dark Grey */
+    --button-reset-hover-bg: #757575;
+    --overlay-bg: rgba(40, 40, 40, 0.98);
+    --overlay-shadow: 0 0 20px rgba(0,0,0,0.5);
+    --level-button-bg: #616161;
+    --level-button-color: #e0e0e0;
+    --level-button-hover-bg: #757575;
+    --level-locked-bg: #424242;
+    --level-locked-color: #757575;
+    --level-unlocked-bg: #388E3C; /* Dark Green */
+    --level-unlocked-color: #e8f5e9;
+    --level-unlocked-hover-bg: #4CAF50;
+    --level-completed-bg: #FBC02D; /* Yellow */
+    --level-completed-color: #424242; /* Dark Grey */
+    --level-completed-hover-bg: #FFEB3B;
+    --hint-toggle-color: #bdbdbd;
+    --hint-toggle-hover-color: #fff;
+    --menu-nav-button-bg: rgba(80, 80, 80, 0.7);
+    --menu-nav-button-hover-bg: rgba(100, 100, 100, 0.9);
+    --menu-nav-button-color: #e0e0e0;
+    --paddle-label-color: #ccc;
+    --paddle-label-results-color: var(--button-text-color); /* Use button text color for results label */
+    --star-empty-color: #777;
+    --star-filled-color: #ffeb3b; /* Brighter yellow for dark mode */
+    --volume-slider-track-bg: #555;
+    --volume-slider-thumb-bg: #bbb;
+    --volume-slider-thumb-border: 2px solid var(--container-bg);
+    --speaker-icon-color: var(--hint-toggle-color);
+    --paddle-drag-over-border: 3px dashed var(--button-primary-hover-bg);
+    --key-input-bg: #555;
+    --key-input-border: #777;
+    --key-input-focus-border: var(--button-primary-hover-bg);
+    /* Pulse duration is same for both themes */
+}
+
+/* Transition for theme changes */
+:root, .dark-mode {
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Apply transitions to elements using these variables */
+body, #display-area, #input-area, .pattern-container,
+#text-display-wrapper, .morse-button, .overlay, .modal, .modal-header,
+input[type="text"], input[type="range"], input[type="checkbox"], button,
+#playback-morse-display, #sandbox-morse-preview, .key-input {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, fill 0.3s ease, stroke 0.3s ease;
+    /* Add other properties as needed */
+}
+/* Prevent transition on SVG path display property */
+#speaker-icon svg path[id^="speaker-wave-"] {
+    transition: display 0s, stroke 0.3s ease;
+}

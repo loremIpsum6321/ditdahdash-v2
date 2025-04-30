@@ -1,0 +1,311 @@
+/* Dit-Dah-Dash_Refactored/assets/css/components.css */
+
+/**
+ * css/components.css
+ * ------------------
+ * Styles for reusable UI components like buttons, overlays, inputs, etc.
+ * Extracted from the original style.css.
+ */
+
+/* --- General Button Styles (used in overlays, playback, sandbox) --- */
+button:not(.menu-nav-button):not(.morse-button):not(.level-button):not(.hint-toggle):not(.modal-close-button) {
+    padding: 10px 20px;
+    font-size: 1.2em;
+    font-family: 'Roboto Mono', monospace; /* Consistent font */
+    cursor: pointer;
+    border: none;
+    border-radius: 8px;
+    color: var(--button-text-color);
+    transition: background-color 0.2s ease, transform 0.1s ease;
+    flex-shrink: 0; /* Prevent shrinking in flex containers */
+    margin: 5px; /* Add some default margin */
+}
+button:not(.menu-nav-button):not(.morse-button):not(.level-button):not(.hint-toggle):not(.modal-close-button):hover:not(:disabled) {
+    transform: translateY(-1px); /* Slight lift on hover */
+}
+button:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+/* Specific Button Types */
+#play-sentence-button { background-color: var(--button-success-bg); }
+#play-sentence-button:hover:not(:disabled) { background-color: var(--button-success-hover-bg); }
+#play-sentence-button:disabled { background-color: #cccccc; } /* Specific disabled style */
+
+#start-sandbox-button { background-color: var(--button-primary-bg); }
+#start-sandbox-button:hover:not(:disabled) { background-color: var(--button-primary-hover-bg); }
+#start-sandbox-button:disabled { background-color: #cccccc; } /* Specific disabled style */
+
+/* Buttons within overlays often have shared styles */
+.overlay button:not(.menu-nav-button) {
+    padding: 12px 24px;
+    font-size: 1.3em;
+    background-color: var(--button-primary-bg);
+    min-width: 140px;
+}
+.overlay button:not(.menu-nav-button):hover:not(:disabled) {
+    background-color: var(--button-primary-hover-bg);
+}
+/* Main menu buttons styling */
+#main-menu-overlay button { width: 70%; max-width: 300px; margin: 10px 0; }
+#show-settings-button { background-color: var(--button-secondary-bg); }
+#show-settings-button:hover { background-color: var(--button-secondary-hover-bg); }
+
+/* --- Overlays (Common Styles) --- */
+.overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: var(--overlay-bg);
+    z-index: 20; /* Ensure overlays are above other content */
+    display: flex; /* Use flex for easier centering/layout */
+    flex-direction: column;
+    justify-content: flex-start; /* Align content towards the top */
+    align-items: center;
+    padding: 20px;
+    padding-top: 50px; /* Space for potential nav button */
+    text-align: center;
+    box-shadow: var(--overlay-shadow);
+    overflow-y: auto; /* Allow scrolling if content overflows */
+    font-size: 1.4em; /* Base font size for overlays */
+    color: var(--text-color);
+    /* Theme transitions applied in themes.css */
+}
+.overlay h2 {
+    margin-bottom: 20px;
+    margin-top: 10px;
+    color: var(--text-color);
+    font-size: 1.8em;
+    flex-shrink: 0;
+    overflow: hidden; /* Prevent text overflow issues */
+}
+.overlay p {
+    margin-bottom: 15px;
+    font-size: 1.2em;
+    color: var(--text-color);
+    opacity: 0.9;
+    flex-shrink: 0;
+}
+.overlay small { /* Optional style if used */
+    font-size: 1.0em;
+    color: var(--text-color);
+    opacity: 0.7;
+    display: block;
+    margin-bottom: 15px;
+    flex-shrink: 0;
+}
+.overlay > div { /* Direct div children often act as containers */
+    margin-top: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+/* --- Playback & Sandbox Area Components --- */
+#playback-area, #sandbox-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    gap: 15px;
+    flex-grow: 1; /* Take remaining space in display-area */
+    overflow-y: auto;
+    width: 100%;
+    height: 100%;
+    position: relative; /* For menu button positioning */
+}
+#playback-area h2, #sandbox-area h2 {
+    margin-bottom: 10px; /* Overrides overlay h2 margin */
+}
+#playback-area label, #sandbox-area label {
+    font-size: 1.1em;
+    margin-bottom: -10px; /* Pull input closer */
+    color: var(--text-color);
+}
+#playback-input, #sandbox-input {
+    font-family: 'Roboto Mono', monospace;
+    font-size: 1.3em;
+    padding: 8px 12px;
+    border: var(--playback-input-border);
+    border-radius: 6px;
+    width: 80%;
+    max-width: 500px;
+    text-align: center;
+    background-color: var(--playback-input-bg);
+    color: var(--text-color);
+    /* Theme transitions applied in themes.css */
+}
+#playback-morse-display, #sandbox-morse-preview {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 1.1em;
+    color: var(--playback-morse-color);
+    margin-top: 10px;
+    word-break: break-all; /* Allow long morse strings to wrap */
+    background-color: var(--playback-morse-bg);
+    padding: 5px 10px;
+    border-radius: 4px;
+    max-width: 90%;
+    min-height: 1.5em; /* Ensure space even when empty */
+    /* Theme transitions applied in themes.css */
+}
+
+/* --- Level Selection List --- */
+#level-selection-screen h2 { margin-bottom: 15px; }
+#level-list {
+    display: flex;
+    flex-direction: column; /* Stack buttons vertically */
+    align-items: stretch; /* Make buttons fill width */
+    gap: 10px;
+    margin-bottom: 20px;
+    width: 90%;
+    max-width: 500px;
+    padding: 10px;
+    border-radius: 8px;
+    flex-shrink: 0; /* Prevent shrinking */
+}
+#level-list button { /* Style for buttons specifically in the level list */
+    padding: 12px 15px;
+    font-size: 1.2em;
+    border: none;
+    border-radius: 6px;
+    transition: background-color 0.2s ease, transform 0.1s ease, color 0.2s ease;
+    margin: 0; /* Override default button margin */
+    width: 100%;
+    text-align: center;
+    box-sizing: border-box;
+    cursor: pointer;
+}
+#level-list button:hover:not(:disabled) {
+    transform: scale(1.01); /* Subtle grow effect */
+}
+#level-list button.locked {
+    background-color: var(--level-locked-bg);
+    color: var(--level-locked-color);
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+#level-list button.unlocked {
+    background-color: var(--level-unlocked-bg);
+    color: var(--level-unlocked-color);
+}
+#level-list button.unlocked:hover:not(:disabled) {
+    background-color: var(--level-unlocked-hover-bg);
+}
+#level-list button.completed {
+    background-color: var(--level-completed-bg);
+    color: var(--level-completed-color);
+}
+#level-list button.completed:hover:not(:disabled) {
+    background-color: var(--level-completed-hover-bg);
+}
+#level-list button:disabled { /* Ensure disabled buttons are not interactive */
+    pointer-events: none;
+}
+
+/* --- Results Screen Components --- */
+#results-screen { overflow-y: hidden; /* Prevent vertical scrolling */}
+#results-screen h2 { margin-bottom: 10px; overflow: hidden; }
+#results-rating { margin-bottom: 15px; }
+#results-stats { margin-bottom: 10px; }
+#results-stats p {
+    font-size: 1.2em;
+    margin-bottom: 5px;
+    color: var(--stats-color);
+}
+#level-unlock-message {
+    color: var(--char-completed-color); /* Use completed color for positive message */
+    font-weight: bold;
+    margin-bottom: 15px;
+    font-size: 1.1em;
+    min-height: 1.4em; /* Reserve space even if empty */
+}
+#results-screen .results-instructions {
+    font-size: 1.0em;
+    opacity: 0.8;
+    margin-bottom: 10px;
+    overflow: hidden; /* Prevent text overflow */
+}
+#results-screen .results-instructions .key-hint {
+    display: inline-block;
+    padding: 0 4px;
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    background-color: var(--container-bg);
+    font-weight: bold;
+    font-size: 0.9em;
+}
+#results-screen div:last-of-type { margin-top: 10px; overflow: hidden; } /* Spacing for bottom button container */
+
+/* Star Rating */
+.star-rating {
+    font-size: 2.5em;
+    color: var(--star-empty-color);
+    display: inline-block;
+    margin-bottom: 15px;
+}
+.star {
+    cursor: default;
+    transition: color 0.2s ease-in-out;
+    padding: 0 2px;
+}
+.star.filled {
+    color: var(--star-filled-color);
+}
+
+/* --- Settings Key Mapping Inputs (Component Style) --- */
+.key-mapping-row {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 10px;
+    width: 100%;
+}
+.key-mapping-row label { /* Style specific to labels in this row */
+    width: auto !important;
+    display: inline !important;
+    flex-shrink: 0;
+    margin-bottom: 0;
+    min-width: 70px; /* Ensure alignment */
+    text-align: right;
+}
+.key-input {
+    padding: 6px 10px;
+    font-family: 'Roboto Mono', monospace;
+    font-size: 1em;
+    text-align: center;
+    border: 1px solid var(--key-input-border);
+    border-radius: 4px;
+    background-color: var(--key-input-bg);
+    color: var(--text-color);
+    width: 90px; /* Fixed width */
+    cursor: pointer;
+    transition: border-color 0.2s ease, background-color 0.3s ease, color 0.3s ease;
+    text-transform: uppercase; /* Display keys in uppercase */
+}
+.key-input:focus {
+    outline: none;
+    border-color: var(--key-input-focus-border);
+    box-shadow: 0 0 0 2px var(--button-primary-hover-bg); /* Use theme color */
+}
+.key-input.listening {
+    font-style: italic;
+    opacity: 0.8;
+}
+
+/* --- Responsive Adjustments for Components --- */
+@media screen and (orientation: landscape) and (max-height: 500px) {
+    .star-rating { font-size: 2em; margin-bottom: 10px;}
+    #results-stats p { font-size: 1em; margin-bottom: 3px;}
+    #results-screen .results-instructions { font-size: 0.9em; }
+}
+
+@media (max-width: 360px) {
+    #level-list button { font-size: 1.1em; padding: 10px 12px; }
+}
