@@ -24,6 +24,7 @@ export class SettingsModal {
         this.resetProgressButton = getElementByIdSafe('reset-progress-button');
         this.ditKeyInput = getElementByIdSafe('dit-key-input');
         this.dahKeyInput = getElementByIdSafe('dah-key-input');
+        this.resetSettingsButton = getElementByIdSafe('reset-settings-button'); // Add this line
         // Note: Modal container, header, close button are managed by ModalManager
 
         // Internal state for key mapping
@@ -235,6 +236,11 @@ export class SettingsModal {
         if (!callbacks) {
             console.error("SettingsModal: Missing callbacks object for addEventListeners.");
             return;
+        }
+
+        // Reset Settings Button
+        if (this.resetSettingsButton && typeof callbacks.onResetSettings === 'function') {
+            this.resetSettingsButton.addEventListener('click', callbacks.onResetSettings);
         }
 
         // WPM Slider

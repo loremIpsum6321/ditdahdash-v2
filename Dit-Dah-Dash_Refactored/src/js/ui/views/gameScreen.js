@@ -375,14 +375,6 @@ export class GameScreen {
     updateWpmDisplay(netWpm) { setTextContent(this.wpmDisplay, `Net WPM: ${netWpm.toFixed(0)}`); }
     updateAccuracyDisplay(accuracy) { setTextContent(this.accuracyDisplay, `Accuracy: ${accuracy.toFixed(1)}%`); }
     updateGrossWpmDisplay(grossWpm) { setTextContent(this.grossWpmDisplay, `Gross WPM: ${grossWpm.toFixed(0)}`); }
-    /**
- * Updates both the volume slider position and the speaker icon display.
- * @param {number} volume - The volume level (0.0 to 1.0).
- */
-    updateVolumeUI(volume) {
-    this.setVolumeSliderValue(volume);
-    this.updateSpeakerIcon(volume);
-}
     /** Resets stats display text and pattern displays. */
     resetStatsAndPatterns() { this.updateTimer(0); this.updateWpmDisplay(0); this.updateAccuracyDisplay(100); this.updateGrossWpmDisplay(0); this.updateTargetPatternDisplay(""); this.updateUserPatternDisplay(""); this.setPatternDisplayState('default'); this._applyHintVisibility(this.isHintVisible, false); }
 
@@ -400,21 +392,35 @@ export class GameScreen {
         waves[1]?.style.setProperty('display', showWave2 ? 'inline' : 'none');
         waves[2]?.style.setProperty('display', showWave3 ? 'inline' : 'none');
     }
+    /**
+     * Updates both the volume slider position and the speaker icon display.
+     * @param {number} volume - The volume level (0.0 to 1.0).
+     */
+    updateVolumeUI(volume) {
+        this.setVolumeSliderValue(volume);
+        this.updateSpeakerIcon(volume);
+    }
 
     // --- Hint Visibility & Pulse ---
     /** Sets the desired hint visibility state (internal tracking). */
     setHintVisibility(visible) {
+         console.log(`[GameScreen.setHintVisibility] Called with visible = ${visible}. Current state: ${this.isHintVisible}`); // DEBUG
          if (typeof visible === 'boolean' && this.isHintVisible !== visible) {
             this.isHintVisible = visible;
             this._applyHintVisibility(this.isHintVisible); // Apply the change visually
              // Return the new state so caller (SettingsManager) can save it
              return this.isHintVisible;
+         } else if (typeof visible === 'boolean' && this.isHintVisible === visible) {
+             // If called with the same state, still ensure visual state is correct
+             this._applyHintVisibility(this.isHintVisible);
+             return this.isHintVisible;
          }
-         return this.isHintVisible; // Return current state if no change
+         return this.isHintVisible; // Return current state if no change or invalid input
     }
 
     /** Applies the visual hint visibility state based on internal state. */
     _applyHintVisibility(visible, startPulseIfVisible = true) {
+        console.log(`[GameScreen._applyHintVisibility] Applying state: visible=${visible}, startPulse=${startPulseIfVisible}`); // DEBUG
         // console.log(`_applyHintVisibility called: visible=${visible}, startPulse=${startPulseIfVisible}`); // Debug
         if (this.targetPatternOuterWrapper && this.toggleHintButton) {
             this.targetPatternOuterWrapper.classList.toggle('hint-hidden', !visible);

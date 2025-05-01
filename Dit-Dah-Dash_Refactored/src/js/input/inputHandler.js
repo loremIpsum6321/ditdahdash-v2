@@ -90,7 +90,9 @@ export class InputHandler {
         // Ignore if:
         // 1. Focus is on playback/sandbox/other text input.
         // 2. Settings modal is open AND focus is *not* one of the key mapping inputs.
-        return isOtherInputFocused || (isSettingsOpen && !isSettingsKeyMapInputFocused);
+        const shouldIgnore = isOtherInputFocused || (isSettingsOpen && !isSettingsKeyMapInputFocused);
+        // console.log(`[InputHandler._shouldIgnoreInput] Target: ${targetElement?.tagName}#${targetElement?.id}, OtherFocused: ${isOtherInputFocused}, SettingsOpen: ${isSettingsOpen}, KeyMapFocused: ${isSettingsKeyMapInputFocused}, Result: ${shouldIgnore}`); // DEBUG
+        return shouldIgnore;
     }
 
 
@@ -159,7 +161,7 @@ export class InputHandler {
 
         // Handle Control key press (only if not already pressed)
         if (pressedKey === 'Control' && !this.isCtrlPressed) {
-             // console.log("Control key pressed."); // Debug
+             console.log("[InputHandler._handleKeyDown] Control key detected. Calling _handleCtrlPress."); // DEBUG
              this.isCtrlPressed = true;
              this._handleCtrlPress(); // Call specific handler
              // Optionally prevent default browser behavior for Ctrl if needed
@@ -187,7 +189,7 @@ export class InputHandler {
                  this.callbacks.onDahRelease('key');
              }
          } else if (releasedKey === 'Control' && this.isCtrlPressed) {
-             // console.log("Control key released."); // Debug
+             console.log("[InputHandler._handleKeyUp] Control key detected. isCtrlPressed=true. Will call _handleCtrlRelease if not ignored."); // DEBUG
              this.isCtrlPressed = false;
              if (!shouldIgnore) {
                  this._handleCtrlRelease(); // Call specific handler only if not ignored
@@ -266,6 +268,7 @@ export class InputHandler {
 
     /** Handles Control key press actions. */
     _handleCtrlPress() {
+        console.log("[InputHandler._handleCtrlPress] Executing. Calling onCtrlToggle(true)."); // DEBUG
         // Notify the main controller/settings manager to potentially show the hint
         if (typeof this.callbacks.onCtrlToggle === 'function') {
             this.callbacks.onCtrlToggle(true); // Pass true for press
@@ -274,6 +277,7 @@ export class InputHandler {
 
     /** Handles Control key release actions. */
     _handleCtrlRelease() {
+        console.log("[InputHandler._handleCtrlRelease] Executing. Calling onCtrlToggle(false)."); // DEBUG
         // Notify the main controller/settings manager to hide the hint
         if (typeof this.callbacks.onCtrlToggle === 'function') {
             this.callbacks.onCtrlToggle(false); // Pass false for release
@@ -290,7 +294,7 @@ export class InputHandler {
 //         onDahPress: (method) => keyingLogic.handlePress('dah', method),
 //         onDitRelease: (method) => keyingLogic.handleRelease('dit', method),
 //         onDahRelease: (method) => keyingLogic.handleRelease('dah', method),
-//         onCtrlToggle: (isPressed) => { /* Logic to show/hide hint */ }
+//         onCtrlToggle: (isPressed) => { /* Logic to show/hide hint */ } // Pass the callback
 //     },
 //     initialKeyMappings // { dit: '.', dah: '-' } e.g.
 // );

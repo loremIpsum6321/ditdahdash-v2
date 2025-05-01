@@ -146,6 +146,7 @@ export class SettingsManager {
         this.modules.audioCtxManager.setVolume(this.settings.volume);
         this.modules.audioCtxManager.setSoundEnabled(this.settings.soundEnabled);
         this.modules.gameScreen.updateVolumeUI(this.settings.volume); // Update slider and icon
+
         // Dark Mode (handled by UI Facade)
         this.modules.uiManagerFacade.applyDarkMode(this.settings.darkModeEnabled);
 
@@ -239,12 +240,18 @@ export class SettingsManager {
     }
 
      setHintVisible(visible) {
+        console.log(`[SettingsManager.setHintVisible] Called with visible = ${visible}. Current state: ${this.settings.hintVisible}`); // DEBUG
         const newVisible = visible === true;
         if (this.settings.hintVisible !== newVisible) {
             this.settings.hintVisible = newVisible;
             this._saveSettings();
             this.modules.gameScreen.setHintVisibility(newVisible); // Apply directly to game screen
-             // console.log(`Setting Hint Visible applied: ${newVisible}`); // Debug
+             console.log(`[SettingsManager.setHintVisible] Setting Hint Visible applied: ${newVisible}`); // Debug
+        } else {
+             // Even if state is the same, ensure GameScreen visually reflects it
+             // This handles the case where CTRL release wants to hide an already hidden hint
+             this.modules.gameScreen.setHintVisibility(newVisible);
+             console.log(`[SettingsManager.setHintVisible] State unchanged (${newVisible}), re-applying to GameScreen.`); // Debug
         }
     }
 

@@ -201,6 +201,16 @@
 }
 .modal-content button:hover {
     background-color: var(--button-reset-hover-bg);
+    /* Specific button styling (Reset Settings) */
+    .modal-content #reset-settings-button {
+    background-color: var(--button-secondary-bg); /* Use secondary color */
+    color: var(--button-text-color); /* Ensure text is readable */
+    border: 1px solid var(--border-color); /* Add border back */
+    }
+    .modal-content #reset-settings-button:hover {
+    background-color: var(--button-secondary-hover-bg);
+    filter: brightness(1); /* Remove filter from progress button */
+    }
 }
 
 /* Specific button styling (Reset Progress) */

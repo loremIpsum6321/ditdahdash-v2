@@ -136,7 +136,7 @@ export class GameState {
     addInput(input) {
         const now = performance.now();
         // Only count inputs if actually in a playing state
-        if (this.isPlaying() || this.status === GameStatus.READY) {
+        if (this.isPlaying() || this.status === GameStatus.READY) { // Adjusted check for READY
             this.totalInputs++; // Track game/sandbox inputs
         }
         this.inputTimestamps.push({ input, time: now });
@@ -218,10 +218,12 @@ export class GameState {
 
     /** Checks if the game is in an active playing state (input matters for game/sandbox). */
     isPlaying() {
+        // *** MODIFIED: Added GameStatus.READY to the check ***
         return (this.currentMode === AppMode.GAME || this.currentMode === AppMode.SANDBOX) &&
-               (this.status === GameStatus.LISTENING ||
-               this.status === GameStatus.TYPING ||
-               this.status === GameStatus.DECODING);
+               (this.status === GameStatus.READY || // Allow interaction when level is ready
+                this.status === GameStatus.LISTENING ||
+                this.status === GameStatus.TYPING ||
+                this.status === GameStatus.DECODING);
     }
 
      /** Checks if audio playback is active. */
@@ -259,8 +261,10 @@ export class GameState {
              }
             return this.elapsedTime;
         }
-        if (this.status === GameStatus.READY || this.isPlaying()) {
-            return performance.now() - this.startTime;
+        // Also include READY state for time calculation if needed, although timer starts on first input
+        if (this.isPlaying()) { // isPlaying now includes READY
+            // If READY but timer not started, return 0. Otherwise, return time since start.
+            return this.startTime > 0 ? (performance.now() - this.startTime) : 0;
         }
 
         return 0; // Return 0 if not actively timing

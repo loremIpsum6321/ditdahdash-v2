@@ -266,21 +266,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
      /** Handles Control key press/release for hint peeking/hiding. */
      function handleCtrlToggle(isPressed) {
+        console.log(`[main.handleCtrlToggle] Called with isPressed = ${isPressed}`); // DEBUG
         // Only handle if game is active
-        if (!gameState.isPlaying()) return;
+        if (!gameState.isPlaying()) {
+            console.log("[main.handleCtrlToggle] Skipping: gameState not playing."); // DEBUG
+            return;
+        }
 
         if (isPressed) {
             // Store current state and show hint if it was hidden
             hintStateBeforeCtrl = settingsManager.getSettings().hintVisible;
+            console.log(`[main.handleCtrlToggle] Current hint state: ${hintStateBeforeCtrl}`); // DEBUG
             if (!hintStateBeforeCtrl) {
-                // console.log("Ctrl Press: Showing hint temporarily."); // Debug
+                console.log("[main.handleCtrlToggle] Hint was hidden, calling setHintVisible(true)..."); // DEBUG
                 settingsManager.setHintVisible(true);
             } else {
-                // console.log("Ctrl Press: Hint already visible, doing nothing."); // Debug
+                 console.log("[main.handleCtrlToggle] Hint already visible, doing nothing on press."); // DEBUG
             }
         } else {
             // On release, always hide the hint (peek or shortcut hide)
-            // console.log(`Ctrl Release: Hiding hint (was visible: ${hintStateBeforeCtrl})`); // Debug
+            console.log("[main.handleCtrlToggle] Control released, calling setHintVisible(false)..."); // DEBUG
             settingsManager.setHintVisible(false);
             hintStateBeforeCtrl = null; // Reset stored state
         }
@@ -447,6 +452,8 @@ document.addEventListener('DOMContentLoaded', () => {
          onDarkModeToggle: (enabled) => settingsManager.setDarkModeEnabled(enabled),
          onKeyMappingChange: (mappings) => settingsManager.setKeyMappings(mappings),
          onResetProgress: resetProgress,
+         onResetProgress: resetProgress,
+         onResetSettings: handleResetSettings
      });
 
     // Add global ESC key listener
@@ -459,5 +466,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Initial Application State ---
     showMainMenuScreen(); // Show the main menu first
     console.log("Dit-Dah-Dash Refactored Initialized.");
+    
+    /** Resets configurable settings to defaults. */
+    function handleResetSettings() {
+        if (confirm("Reset all appearance and input settings (WPM, keys, volume, theme, paddle textures, etc.) to their defaults? Game progress will not be affected.")) {
+            console.log("Resetting settings to defaults...");
+            settingsManager.resetToDefaults(); // Resets core settings & applies them
+            uiFacade.getPaddleControls()?.resetPaddleTextures(); // Reset paddle textures
 
+            // Crucially, update the modal UI itself to show the new defaults
+            settingsModalUI.updateDisplayValues(settingsManager.getSettings());
+            console.log("Settings reset complete.");
+        }
+    }
 }); // End DOMContentLoaded

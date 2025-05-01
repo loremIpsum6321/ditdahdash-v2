@@ -234,6 +234,21 @@ export class PaddleControls {
          }
         // console.log("Texture removed from:", paddleElement.id);
     }
+    /** Resets paddle textures to default (none) and clears storage. */
+    resetPaddleTextures() {
+        console.log("Resetting paddle textures..."); // Debug
+        this._removeTexture(this.ditButton);
+        this._removeTexture(this.dahButton);
+        // Clear internal state
+        this.paddleTextures.dit = null;
+        this.paddleTextures.dah = null;
+        // Remove from local storage
+        try {
+            localStorage.removeItem(STORAGE_KEYS.PADDLE_TEXTURES);
+        } catch (e) {
+            console.error("Error removing paddle textures from localStorage:", e);
+        }
+    }
     // --- End Paddle Texture Drag and Drop ---
 
 }
