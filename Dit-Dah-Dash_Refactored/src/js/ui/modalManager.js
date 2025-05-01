@@ -34,6 +34,8 @@ export class Modal {
         // Store initial modal position to avoid recalculating bounds constantly
         this.initialModalX = 0;
         this.initialModalY = 0;
+        // Track if the modal has been dragged since last opened
+        this.hasBeenDraggedSinceOpen = false;
 
         if (!this.modalElement || !this.closeButton || !this.headerElement) {
             console.error(`Modal initialization failed: Modal ('${modalId}'), Close Button ('${closeButtonId}'), or Header ('${headerId}') not found.`);
@@ -44,7 +46,7 @@ export class Modal {
         }
 
         this._bindEvents();
-        // Initial position is set on open, not constructor, to ensure it's centered each time
+        // Initial position is set on open, not constructor
     }
 
     /**
@@ -74,8 +76,8 @@ export class Modal {
         this.modalElement.addEventListener('mousedown', (e) => {
              // Allow drag only if target is the header or within the header
              if (!(e.target === this.headerElement || this.headerElement.contains(e.target))) {
-                 // If click is on content, stop propagation so header drag doesn't start
-                 // e.stopPropagation(); // This might prevent clicks on content buttons/inputs? Test needed.
+                 // Stop clicks in content from initiating a drag
+                 e.stopPropagation();
              }
         });
 
@@ -87,24 +89,29 @@ export class Modal {
     }
 
      /**
-     * Sets the initial position (centered) when the modal is opened.
-     * Ensures transform is cleared if position was set manually by dragging.
+     * Sets the initial position when the modal is opened.
+     * Centers using transform if not previously dragged, otherwise restores pixel position.
      * @private
      */
      _setInitialPosition() {
          if (!this.modalElement) return;
 
-         // Check if style.left/top have been set (indicating it was dragged)
-         const hasBeenDragged = this.modalElement.style.left || this.modalElement.style.top;
+         // Reset drag flag on open
+         this.hasBeenDraggedSinceOpen = false;
 
-         if (!hasBeenDragged) {
-            // Center using transform only if not dragged previously
+         // Check if style.left/top have been set (indicating it was dragged last time)
+         const hasPixelPosition = this.modalElement.style.left || this.modalElement.style.top;
+
+         if (!hasPixelPosition) {
+            // Center using transform only if no pixel position is set
             this.modalElement.style.left = '50%';
             this.modalElement.style.top = '50%';
             this.modalElement.style.transform = 'translate(-50%, -50%)';
+            // console.log("Modal: Centering with transform."); // Debug
          } else {
-             // If left/top *are* set, ensure transform is removed as we position via pixels
+             // If left/top *are* set, ensure transform is removed
              this.modalElement.style.transform = '';
+             // console.log(`Modal: Restoring pixel position: left=${this.modalElement.style.left}, top=${this.modalElement.style.top}`); // Debug
          }
      }
 
@@ -113,8 +120,8 @@ export class Modal {
      */
     open() {
         if (!this.modalElement) return;
+        this._setInitialPosition(); // Set position *before* removing hidden class
         this.modalElement.classList.remove('hidden');
-        this._setInitialPosition(); // Recenter or ensure position is correct on open
         if (typeof this.onOpen === 'function') {
             try {
                 this.onOpen();
@@ -138,6 +145,8 @@ export class Modal {
                  console.error("Error in modal onClose callback:", e);
              }
         }
+        // Reset drag flag on close, position will be recalculated on next open
+        this.hasBeenDraggedSinceOpen = false;
         // console.log("Modal closed"); // Debug
     }
 
@@ -151,7 +160,7 @@ export class Modal {
 
     /**
      * Handles the start of a drag operation (mousedown/touchstart).
-     * Uses pageX/pageY for robust offset calculation across scrolling.
+     * Calculates offsets correctly whether initially centered or pixel-positioned.
      * @param {MouseEvent | TouchEvent} e - The event object.
      * @private
      */
@@ -163,45 +172,40 @@ export class Modal {
         if (!this.modalElement) return;
 
         this.isDragging = true;
-        this.modalElement.style.cursor = 'grabbing'; // Indicate dragging on modal
-        this.headerElement.style.cursor = 'grabbing'; // Indicate dragging on header
+        this.modalElement.style.cursor = 'grabbing';
+        this.headerElement.style.cursor = 'grabbing';
+        this.hasBeenDraggedSinceOpen = true; // Mark as dragged
 
         let pointerX, pointerY;
         if (e.type === "touchstart") {
-            if (e.touches.length !== 1) { // Only support single touch drag
-                this._dragEnd(e); return;
-            }
-            pointerX = e.touches[0].pageX; // Use pageX for touch relative to document
-            pointerY = e.touches[0].pageY; // Use pageY for touch relative to document
-            e.preventDefault(); // Prevent page scroll/zoom during touch drag on header
+            if (e.touches.length !== 1) { this._dragEnd(e); return; }
+            pointerX = e.touches[0].pageX;
+            pointerY = e.touches[0].pageY;
+            e.preventDefault();
         } else {
-            // Only handle left mouse button for dragging
-            if (e.button !== 0) {
-                 this.isDragging = false; // Don't start drag for other buttons
-                 return;
-            }
-            pointerX = e.pageX; // Use pageX for mouse relative to document
-            pointerY = e.pageY; // Use pageY for mouse relative to document
+            if (e.button !== 0) { this.isDragging = false; return; }
+            pointerX = e.pageX;
+            pointerY = e.pageY;
         }
 
-        // --- Refined Offset Calculation ---
-        // Remove transform to work reliably with pixel values via getBoundingClientRect
-        this.modalElement.style.transform = '';
-
-        // Get the current pixel position relative to viewport
+        // --- Calculate Initial Position and Offset ---
+        // 1. Get current visual position (accounts for transform or pixel pos)
         const rect = this.modalElement.getBoundingClientRect();
-        // Convert viewport-relative rect.left/top to document-relative positions by adding scroll offset
-        this.initialModalX = rect.left + window.scrollX;
-        this.initialModalY = rect.top + window.scrollY;
+        const currentModalDocX = rect.left + window.scrollX;
+        const currentModalDocY = rect.top + window.scrollY;
 
-        // Calculate offset from the modal's document-relative top-left corner to the pointer's document position
-        this.offsetX = pointerX - this.initialModalX;
-        this.offsetY = pointerY - this.initialModalY;
+        // 2. Calculate offset from current top-left to pointer
+        this.offsetX = pointerX - currentModalDocX;
+        this.offsetY = pointerY - currentModalDocY;
 
-        // Set position explicitly using pixels immediately to prevent jump on first move
-        this.modalElement.style.left = `${this.initialModalX}px`;
-        this.modalElement.style.top = `${this.initialModalY}px`;
-        // --- End Refinement ---
+        // 3. Immediately switch to pixel positioning to avoid jump
+        // Remove transform *if it exists*
+        this.modalElement.style.transform = '';
+        // Set position using calculated document coordinates
+        this.modalElement.style.left = `${currentModalDocX}px`;
+        this.modalElement.style.top = `${currentModalDocY}px`;
+        // --- End Calculation ---
+        // console.log(`Drag Start: Initial Pos (${currentModalDocX.toFixed(0)}, ${currentModalDocY.toFixed(0)}), Offset (${this.offsetX.toFixed(0)}, ${this.offsetY.toFixed(0)})`); // Debug
     }
 
 
@@ -214,48 +218,42 @@ export class Modal {
     _drag(e) {
         if (!this.isDragging || !this.modalElement) return;
 
-        // Prevent default actions like text selection during mouse drag
         if (e.type === "mousemove") {
             e.preventDefault();
         }
 
         let pointerX, pointerY;
         if (e.type === "touchmove") {
-             if (e.touches.length !== 1) { // Ensure still single touch
-                 this._dragEnd(e); return;
-             }
-             pointerX = e.touches[0].pageX; // Use pageX for touch
-             pointerY = e.touches[0].pageY; // Use pageY for touch
-             // preventDefault is handled in dragStart for touch
+             if (e.touches.length !== 1) { this._dragEnd(e); return; }
+             pointerX = e.touches[0].pageX;
+             pointerY = e.touches[0].pageY;
         } else {
-            pointerX = e.pageX; // Use pageX for mouse
-            pointerY = e.pageY; // Use pageY for mouse
+            pointerX = e.pageX;
+            pointerY = e.pageY;
         }
 
         // Calculate new top-left corner position based on current pointer and initial offset
         let newX = pointerX - this.offsetX;
         let newY = pointerY - this.offsetY;
 
-        // Basic boundary check to keep modal roughly within viewport edges
-        // Note: This is a simple check and might not be perfect with zooming/complex layouts
+        // --- Boundary Check (Keep modal roughly within viewport) ---
+        // Simplified check: ensure top-left corner stays within scrollable document area
+        // A more sophisticated check might consider the entire modal dimensions vs viewport
+        const docWidth = document.documentElement.scrollWidth;
+        const docHeight = document.documentElement.scrollHeight;
         const modalWidth = this.modalElement.offsetWidth;
         const modalHeight = this.modalElement.offsetHeight;
-        const minX = 0; // Limit left edge to viewport left
-        const minY = 0; // Limit top edge to viewport top
-        // Limit right edge (modal's left + width) to viewport width
-        const maxX = window.innerWidth - modalWidth;
-        // Limit bottom edge (modal's top + height) to viewport height
-        const maxY = window.innerHeight - modalHeight;
 
-        // Adjust for scrolling position to compare against document coordinates
-        const docMinX = window.scrollX + minX;
-        const docMinY = window.scrollY + minY;
-        const docMaxX = window.scrollX + maxX;
-        const docMaxY = window.scrollY + maxY;
+        // Clamp X: Ensure left edge > 0 and right edge < docWidth
+        newX = Math.max(0, Math.min(newX, docWidth - modalWidth));
+        // Clamp Y: Ensure top edge > 0 and bottom edge < docHeight
+        newY = Math.max(0, Math.min(newY, docHeight - modalHeight));
 
-        // Clamp the calculated newX/newY within document bounds
-        newX = Math.max(docMinX, Math.min(newX, docMaxX));
-        newY = Math.max(docMinY, Math.min(newY, docMaxY));
+        // Alternative simpler boundary check: keep within viewport (less robust with scrolling)
+        // const vpWidth = window.innerWidth;
+        // const vpHeight = window.innerHeight;
+        // newX = Math.max(window.scrollX, Math.min(newX, window.scrollX + vpWidth - modalWidth));
+        // newY = Math.max(window.scrollY, Math.min(newY, window.scrollY + vpHeight - modalHeight));
 
         // Apply the calculated position
         this._setPosition(newX, newY);
@@ -271,11 +269,14 @@ export class Modal {
              this.isDragging = false;
              if (this.modalElement) this.modalElement.style.cursor = ''; // Reset cursor on modal
              if (this.headerElement) this.headerElement.style.cursor = 'move'; // Reset header cursor
+             // Position is already set in pixels by _drag
+             // console.log(`Drag End: Final Pos (${this.modalElement.style.left}, ${this.modalElement.style.top})`); // Debug
          }
     }
 
     /**
      * Sets the position of the modal element using left/top styles (in pixels).
+     * Ensures transform is cleared.
      * @param {number} xPos - The target X coordinate (document-relative).
      * @param {number} yPos - The target Y coordinate (document-relative).
      * @private
@@ -284,8 +285,8 @@ export class Modal {
         if (!this.modalElement) return;
         this.modalElement.style.left = `${xPos}px`;
         this.modalElement.style.top = `${yPos}px`;
-         // Ensure transform is cleared as we are using left/top for positioning
-         this.modalElement.style.transform = '';
+        // Ensure transform is cleared as we are using left/top for positioning
+        this.modalElement.style.transform = '';
     }
 }
 

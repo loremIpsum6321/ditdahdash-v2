@@ -7,8 +7,8 @@ import { KEYBINDING_DEFAULTS } from '../core/configConstants.js';
  * js/input/inputHandler.js
  * ------------------------
  * Detects raw user input events (keyboard, mouse, touch) related to
- * Dit and Dah actions. Translates these events into simplified press/release
- * notifications via callbacks, without interpreting Morse timing or logic itself.
+ * Dit, Dah, and modifier key actions. Translates these events into simplified
+ * press/release notifications via callbacks, without interpreting Morse timing or logic itself.
  */
 
 export class InputHandler {
@@ -18,12 +18,14 @@ export class InputHandler {
      * @param {function} callbacks.onDahPress - Called when Dah action starts (any method).
      * @param {function} callbacks.onDitRelease - Called when Dit action ends (any method).
      * @param {function} callbacks.onDahRelease - Called when Dah action ends (any method).
+     * @param {function} callbacks.onCtrlToggle - Called when Control key is pressed (true) or released (false).
      * @param {object} initialKeyMappings - Initial keybindings { dit: 'key', dah: 'key' }
      */
     constructor(callbacks, initialKeyMappings) {
         if (!callbacks || typeof callbacks.onDitPress !== 'function' || typeof callbacks.onDahPress !== 'function' ||
-            typeof callbacks.onDitRelease !== 'function' || typeof callbacks.onDahRelease !== 'function') {
-            throw new Error("InputHandler requires callbacks for onDitPress, onDahPress, onDitRelease, onDahRelease.");
+            typeof callbacks.onDitRelease !== 'function' || typeof callbacks.onDahRelease !== 'function' ||
+            typeof callbacks.onCtrlToggle !== 'function') { // Added check for onCtrlToggle
+            throw new Error("InputHandler requires callbacks for onDitPress, onDahPress, onDitRelease, onDahRelease, and onCtrlToggle.");
         }
         this.callbacks = callbacks;
 
@@ -48,6 +50,7 @@ export class InputHandler {
         this.isDahPressed = false; // Tracks combined state (mouse/touch)
         this.isDitKeyPressed = false; // Tracks key state
         this.isDahKeyPressed = false; // Tracks key state
+        this.isCtrlPressed = false; // Tracks Control key state
         this.activeTouchIds = { dit: null, dah: null }; // Track specific touches
 
         if (!this.ditButton || !this.dahButton) {
@@ -130,47 +133,67 @@ export class InputHandler {
     // --- Raw Event Handlers ---
 
     _handleKeyDown(event) {
-        if (this._shouldIgnoreInput(event.target) || event.repeat) {
-            return; // Ignore if input focused, settings open, or key repeat
-        }
-
+        // Ignore if input should be ignored or if it's a repeat event for Dit/Dah
+        const shouldIgnore = this._shouldIgnoreInput(event.target);
         const pressedKey = event.key;
         const isDitKey = pressedKey.toLowerCase() === this.keyMappings.dit.toLowerCase();
         const isDahKey = pressedKey.toLowerCase() === this.keyMappings.dah.toLowerCase();
 
-        if (isDitKey && !this.isDitKeyPressed) {
-             event.preventDefault();
-             this.isDitKeyPressed = true;
-             this.callbacks.onDitPress('key'); // Notify press with method
-        } else if (isDahKey && !this.isDahKeyPressed) {
-             event.preventDefault();
-             this.isDahKeyPressed = true;
-             this.callbacks.onDahPress('key'); // Notify press with method
+        if (shouldIgnore) {
+            // console.log(`Ignoring keydown: ${pressedKey}`); // Debug
+            return;
         }
+
+        // Handle Dit/Dah press (ignore repeats)
+        if (!event.repeat) {
+            if (isDitKey && !this.isDitKeyPressed) {
+                 event.preventDefault();
+                 this.isDitKeyPressed = true;
+                 this.callbacks.onDitPress('key');
+            } else if (isDahKey && !this.isDahKeyPressed) {
+                 event.preventDefault();
+                 this.isDahKeyPressed = true;
+                 this.callbacks.onDahPress('key');
+            }
+        }
+
+        // Handle Control key press (only if not already pressed)
+        if (pressedKey === 'Control' && !this.isCtrlPressed) {
+             // console.log("Control key pressed."); // Debug
+             this.isCtrlPressed = true;
+             this._handleCtrlPress(); // Call specific handler
+             // Optionally prevent default browser behavior for Ctrl if needed
+             // event.preventDefault();
+         }
     }
 
     _handleKeyUp(event) {
-         if (this._shouldIgnoreInput(event.target)) {
-            // Even if ignoring input, ensure key release state is reset if necessary
-            // This prevents stuck keys if focus changes while key is held.
-             const releasedKey = event.key.toLowerCase();
-             if (releasedKey === this.keyMappings.dit.toLowerCase()) this.isDitKeyPressed = false;
-             if (releasedKey === this.keyMappings.dah.toLowerCase()) this.isDahKeyPressed = false;
-             return;
-         }
-
+        const shouldIgnore = this._shouldIgnoreInput(event.target);
         const releasedKey = event.key;
         const isDitKey = releasedKey.toLowerCase() === this.keyMappings.dit.toLowerCase();
         const isDahKey = releasedKey.toLowerCase() === this.keyMappings.dah.toLowerCase();
 
+        // Always reset key states on release, even if ignored previously (prevents stuck keys)
         if (isDitKey && this.isDitKeyPressed) {
-             event.preventDefault();
              this.isDitKeyPressed = false;
-             this.callbacks.onDitRelease('key'); // Notify release with method
+             if (!shouldIgnore) {
+                 event.preventDefault();
+                 this.callbacks.onDitRelease('key');
+             }
          } else if (isDahKey && this.isDahKeyPressed) {
-             event.preventDefault();
              this.isDahKeyPressed = false;
-             this.callbacks.onDahRelease('key'); // Notify release with method
+             if (!shouldIgnore) {
+                 event.preventDefault();
+                 this.callbacks.onDahRelease('key');
+             }
+         } else if (releasedKey === 'Control' && this.isCtrlPressed) {
+             // console.log("Control key released."); // Debug
+             this.isCtrlPressed = false;
+             if (!shouldIgnore) {
+                 this._handleCtrlRelease(); // Call specific handler only if not ignored
+                 // Optionally prevent default browser behavior for Ctrl if needed
+                 // event.preventDefault();
+             }
          }
     }
 
@@ -238,6 +261,24 @@ export class InputHandler {
             }
         }
     }
+
+    // --- Modifier Key Handlers ---
+
+    /** Handles Control key press actions. */
+    _handleCtrlPress() {
+        // Notify the main controller/settings manager to potentially show the hint
+        if (typeof this.callbacks.onCtrlToggle === 'function') {
+            this.callbacks.onCtrlToggle(true); // Pass true for press
+        }
+    }
+
+    /** Handles Control key release actions. */
+    _handleCtrlRelease() {
+        // Notify the main controller/settings manager to hide the hint
+        if (typeof this.callbacks.onCtrlToggle === 'function') {
+            this.callbacks.onCtrlToggle(false); // Pass false for release
+        }
+    }
 }
 
 // Example Usage (in main.js):
@@ -248,7 +289,8 @@ export class InputHandler {
 //         onDitPress: (method) => keyingLogic.handlePress('dit', method),
 //         onDahPress: (method) => keyingLogic.handlePress('dah', method),
 //         onDitRelease: (method) => keyingLogic.handleRelease('dit', method),
-//         onDahRelease: (method) => keyingLogic.handleRelease('dah', method)
+//         onDahRelease: (method) => keyingLogic.handleRelease('dah', method),
+//         onCtrlToggle: (isPressed) => { /* Logic to show/hide hint */ }
 //     },
 //     initialKeyMappings // { dit: '.', dah: '-' } e.g.
 // );

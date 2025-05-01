@@ -63,17 +63,23 @@ button:disabled {
     z-index: 20; /* Ensure overlays are above other content */
     display: flex; /* Use flex for easier centering/layout */
     flex-direction: column;
+    /* --- Reverted justify-content to flex-start --- */
     justify-content: flex-start; /* Align content towards the top */
-    align-items: center;
+    align-items: center; /* Keep horizontal centering */
     padding: 20px;
-    padding-top: 50px; /* Space for potential nav button */
+    padding-top: 60px; /* Increased top padding to clear menu button */
     text-align: center;
     box-shadow: var(--overlay-shadow);
-    overflow-y: auto; /* Allow scrolling if content overflows */
+    overflow-y: auto; /* Ensure scrolling is enabled on the overlay */
     font-size: 1.4em; /* Base font size for overlays */
     color: var(--text-color);
     /* Theme transitions applied in themes.css */
 }
+    /* Center the main menu overlay specifically */
+    #main-menu-overlay {
+        justify-content: center; /* Override flex-start to center vertically */
+        padding-top: 20px; /* Reset padding if needed, adjust as looks best */
+    }
 .overlay h2 {
     margin-bottom: 20px;
     margin-top: 10px;
@@ -304,6 +310,16 @@ button:disabled {
     .star-rating { font-size: 2em; margin-bottom: 10px;}
     #results-stats p { font-size: 1em; margin-bottom: 3px;}
     #results-screen .results-instructions { font-size: 0.9em; }
+
+    /* Fix: Ensure overlays are still scrollable if needed in landscape */
+    .overlay {
+        justify-content: flex-start; /* Revert centering for scrolling */
+        padding-top: 10px;
+    }
+    /* Fix: Center main menu specifically */
+    #main-menu-overlay {
+        justify-content: center;
+    }
 }
 
 @media (max-width: 360px) {

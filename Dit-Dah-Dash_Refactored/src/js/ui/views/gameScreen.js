@@ -375,6 +375,14 @@ export class GameScreen {
     updateWpmDisplay(netWpm) { setTextContent(this.wpmDisplay, `Net WPM: ${netWpm.toFixed(0)}`); }
     updateAccuracyDisplay(accuracy) { setTextContent(this.accuracyDisplay, `Accuracy: ${accuracy.toFixed(1)}%`); }
     updateGrossWpmDisplay(grossWpm) { setTextContent(this.grossWpmDisplay, `Gross WPM: ${grossWpm.toFixed(0)}`); }
+    /**
+ * Updates both the volume slider position and the speaker icon display.
+ * @param {number} volume - The volume level (0.0 to 1.0).
+ */
+    updateVolumeUI(volume) {
+    this.setVolumeSliderValue(volume);
+    this.updateSpeakerIcon(volume);
+}
     /** Resets stats display text and pattern displays. */
     resetStatsAndPatterns() { this.updateTimer(0); this.updateWpmDisplay(0); this.updateAccuracyDisplay(100); this.updateGrossWpmDisplay(0); this.updateTargetPatternDisplay(""); this.updateUserPatternDisplay(""); this.setPatternDisplayState('default'); this._applyHintVisibility(this.isHintVisible, false); }
 

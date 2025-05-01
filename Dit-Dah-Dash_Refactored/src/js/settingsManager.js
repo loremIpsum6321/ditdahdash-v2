@@ -145,7 +145,7 @@ export class SettingsManager {
         // Volume & Sound Enabled (handled by AudioContextManager)
         this.modules.audioCtxManager.setVolume(this.settings.volume);
         this.modules.audioCtxManager.setSoundEnabled(this.settings.soundEnabled);
-
+        this.modules.gameScreen.updateVolumeUI(this.settings.volume); // Update slider and icon
         // Dark Mode (handled by UI Facade)
         this.modules.uiManagerFacade.applyDarkMode(this.settings.darkModeEnabled);
 
@@ -212,6 +212,7 @@ export class SettingsManager {
                 this.settings.volume = newVol;
                 this._saveSettings();
                 this.modules.audioCtxManager.setVolume(newVol);
+                this.modules.gameScreen.updateVolumeUI(newVol); // Update slider and icon
                 // console.log(`Setting Volume applied: ${newVol}`); // Debug
             }
         }

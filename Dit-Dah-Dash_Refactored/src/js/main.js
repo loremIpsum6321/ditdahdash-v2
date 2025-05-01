@@ -42,6 +42,13 @@ import { SettingsManager } from './settingsManager.js';
 document.addEventListener('DOMContentLoaded', () => {
     console.log("Dit-Dah-Dash Refactored Initializing...");
 
+    // --- History Tracking ---
+    // Simple stack to manage back navigation via ESC key
+    let navigationHistory = ['menu']; // Start at main menu
+
+    // --- Global State for Hint Peek ---
+    let hintStateBeforeCtrl = null; // Tracks original hint state before Ctrl press
+
     // --- Instantiate Core Modules ---
     const gameState = new GameState();
     const morseDecoder = new MorseDecoder();
@@ -61,6 +68,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Declare helper functions BEFORE they are needed by callbacks ---
     let gameTimerIntervalId = null;
     let lastUpdateTime = 0;
+
+    /** Pushes a new state onto the navigation history if it's different from the last. */
+    function pushHistory(state) {
+        if (navigationHistory.at(-1) !== state) {
+            navigationHistory.push(state);
+            // console.log("History Push:", navigationHistory); // Debug
+        }
+    }
 
     /** Starts the UI timer interval to update stats display. */
     function startGameUpdateTimer() {
@@ -96,7 +111,57 @@ document.addEventListener('DOMContentLoaded', () => {
         uiFacade.showLevelSelectScreen(levels);
         gameState.currentMode = AppMode.GAME; // Assume starting game unless sandbox chosen
         gameState.status = GameStatus.LEVEL_SELECT;
+        pushHistory('levelSelect'); // Update history
     }
+
+    /** Navigates to the Sandbox setup screen. */
+    function navigateToSandboxSetup() {
+        stopGameUpdateTimer();
+        sequencePlayer.stopPlayback();
+        gameState.reset(); // Reset state for sandbox
+        gameState.currentMode = AppMode.SANDBOX;
+        gameState.status = GameStatus.SANDBOX_INPUT;
+        uiFacade.showSandboxScreen();
+        pushHistory('sandbox'); // Update history
+    }
+
+     /** Navigates to the Playback setup screen. */
+    function navigateToPlaybackSetup() {
+        stopGameUpdateTimer();
+        sequencePlayer.stopPlayback();
+        gameState.reset(); // Reset state for playback
+        gameState.currentMode = AppMode.PLAYBACK;
+        gameState.status = GameStatus.PLAYBACK_INPUT;
+        uiFacade.showPlaybackScreen();
+        pushHistory('playback'); // Update history
+    }
+
+     /** Navigates to the Game/Sandbox screen (called after level/sentence is chosen). */
+     function navigateToGameScreen() {
+         // Called by gameController.startGameLevel or gameController.startSandboxPractice
+         uiFacade.showGameScreen();
+         // History is pushed based on whether we came from level select ('game') or sandbox setup ('sandboxPractice')
+         if (gameState.currentMode === AppMode.GAME) {
+             pushHistory('game');
+         } else if (gameState.currentMode === AppMode.SANDBOX) {
+             pushHistory('sandboxPractice');
+         }
+     }
+
+     /** Shows the main menu screen and resets relevant state/history. */
+     function showMainMenuScreen() {
+         stopGameUpdateTimer();
+         sequencePlayer.stopPlayback(); // Stop any playback
+         tonePlayer.stopInputTone(); // Stop any lingering input tone
+         tonePlayer.stopFeedbackSounds(); // Stop feedback sounds
+         gameState.reset(); // Full reset for main menu
+         gameState.currentMode = AppMode.MENU;
+         gameState.status = GameStatus.MENU;
+         uiFacade.showMainMenu();
+         // Reset history to only contain 'menu'
+         navigationHistory = ['menu'];
+         // console.log("History Reset:", navigationHistory); // Debug
+     }
 
     /** Handles Dit/Dah input on the results screen. */
     function handleResultsInput(type) { // type is 'dit' or 'dah'
@@ -104,11 +169,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (type === 'dit') { // Retry
             console.log("Main: Results Retry selected.");
-            gameController.retryCurrent();
+            gameController.retryCurrent(); // This will call navigateToGameScreen internally
         } else if (type === 'dah') { // Next
             // Check if 'Next' is actually enabled (handled by GameController)
             console.log("Main: Results Next selected.");
-            gameController.proceedToNext();
+            gameController.proceedToNext(); // This might call navigateToLevelSelect or navigateToGameScreen
         }
     }
 
@@ -164,46 +229,119 @@ document.addEventListener('DOMContentLoaded', () => {
     /** Called when the settings modal is opened. */
     function handleShowSettings() {
         console.log("Settings modal opened.");
+        gameState.status = GameStatus.SETTINGS; // Update status
         // Optional: Pause game if running? Depends on desired behaviour.
-        // settingsModalUI.updateDisplayValues(settingsManager.getSettings()); // Ensure UI matches state
+        settingsModalUI.updateDisplayValues(settingsManager.getSettings()); // Ensure UI matches state
     }
 
     /** Called when the settings modal is closed. */
     function handleHideSettings() {
         console.log("Settings modal closed.");
-        // Optional: Resume game if paused.
+        // Revert status based on what was open before settings
+        const previousState = navigationHistory.at(-1); // Check last screen in history
+        switch(previousState) {
+            case 'game':
+            case 'sandboxPractice':
+                 // If game was paused, resume it here. For now, just set status back.
+                 // We need to know the exact status *before* settings opened.
+                 // This simple history doesn't store that fine-grained state.
+                 // A simple approach: If game was active, revert to LISTENING.
+                 if (gameState.isPlaying() || gameState.status === GameStatus.READY) {
+                      gameState.status = GameStatus.LISTENING;
+                 } else if (gameState.status === GameStatus.FINISHED || gameState.status === GameStatus.SHOWING_RESULTS) {
+                     // Keep results status if settings opened from results
+                     gameState.status = GameStatus.SHOWING_RESULTS;
+                 } else {
+                      // Fallback if unsure
+                       gameState.status = GameStatus.LISTENING;
+                 }
+                 break;
+            case 'levelSelect': gameState.status = GameStatus.LEVEL_SELECT; break;
+            case 'sandbox': gameState.status = GameStatus.SANDBOX_INPUT; break;
+            case 'playback': gameState.status = GameStatus.PLAYBACK_INPUT; break;
+            case 'menu':
+            default: gameState.status = GameStatus.MENU; break;
+        }
     }
 
-    /** Shows the main menu screen and resets relevant state. */
-    function showMainMenuScreen() {
-        stopGameUpdateTimer();
-        sequencePlayer.stopPlayback(); // Stop any playback
-        tonePlayer.stopInputTone(); // Stop any lingering input tone
-        tonePlayer.stopFeedbackSounds(); // Stop feedback sounds
-        // Reset game state only if not coming directly from results/level select
-        if (gameState.status !== GameStatus.SHOWING_RESULTS && gameState.status !== GameStatus.LEVEL_SELECT) {
-            gameState.reset(); // Full reset
+     /** Handles Control key press/release for hint peeking/hiding. */
+     function handleCtrlToggle(isPressed) {
+        // Only handle if game is active
+        if (!gameState.isPlaying()) return;
+
+        if (isPressed) {
+            // Store current state and show hint if it was hidden
+            hintStateBeforeCtrl = settingsManager.getSettings().hintVisible;
+            if (!hintStateBeforeCtrl) {
+                // console.log("Ctrl Press: Showing hint temporarily."); // Debug
+                settingsManager.setHintVisible(true);
+            } else {
+                // console.log("Ctrl Press: Hint already visible, doing nothing."); // Debug
+            }
+        } else {
+            // On release, always hide the hint (peek or shortcut hide)
+            // console.log(`Ctrl Release: Hiding hint (was visible: ${hintStateBeforeCtrl})`); // Debug
+            settingsManager.setHintVisible(false);
+            hintStateBeforeCtrl = null; // Reset stored state
         }
-        gameState.currentMode = AppMode.MENU;
-        gameState.status = GameStatus.MENU;
-        uiFacade.showMainMenu();
+    }
+
+    /** Navigates back one step in the application based on history. */
+    function navigateBack() {
+        console.log("Navigate Back triggered."); // Debug
+
+        // 1. Close settings modal if open
+        if (settingsModalManager && settingsModalManager.isOpen()) {
+            settingsModalManager.close();
+            return;
+        }
+
+        // 2. Check history stack
+        if (navigationHistory.length <= 1) {
+            console.log("Navigate Back: Already at main menu.");
+            return; // Can't go back further than menu
+        }
+
+        // 3. Pop current state and get previous state
+        navigationHistory.pop();
+        const previousState = navigationHistory.at(-1);
+        // console.log("Navigate Back: Target State =", previousState, "History:", navigationHistory); // Debug
+
+        // 4. Navigate to the previous state
+        switch (previousState) {
+            case 'levelSelect':
+                navigateToLevelSelect(); // This function handles its own history push, but it won't push if already last item
+                break;
+            case 'sandbox':
+                navigateToSandboxSetup();
+                break;
+            case 'playback':
+                navigateToPlaybackSetup();
+                break;
+            case 'menu':
+            default:
+                showMainMenuScreen(); // This resets history to ['menu']
+                break;
+            // Note: 'game' or 'sandboxPractice' are not typically navigated *back* to via ESC,
+            // usually you go back *from* them to levelSelect/sandbox/menu.
+            // If settings were open during game, handleHideSettings manages status recovery.
+        }
     }
 
 
     // --- Instantiate Game Controller ---
-    // Now that helper functions are defined, we can pass them directly
     const gameController = new GameController(
         gameState, levelManager, scoreCalculator, morseDecoder, tonePlayer, uiFacade,
          { // Callbacks for GameController
              onGameEndShowMainMenu: showMainMenuScreen,
-             onGameEndShowLevelSelect: navigateToLevelSelect,
+             onGameEndShowLevelSelect: navigateToLevelSelect, // Use updated nav function
              onUpdateUIStatsTimer: (start) => { if (start) startGameUpdateTimer(); else stopGameUpdateTimer(); },
-             getCurrentKeyMappings: () => settingsManager ? settingsManager.getKeyMappings() : KEYBINDING_DEFAULTS // Needs settingsManager instance
+             getCurrentKeyMappings: () => settingsManager ? settingsManager.getKeyMappings() : KEYBINDING_DEFAULTS
          }
     );
 
     // --- Load Initial Settings (BEFORE input handler needs them) ---
-    const initialSettings = {
+     const initialSettings = {
          ditKey: localStorage.getItem(STORAGE_KEYS.SETTINGS_DIT_KEY) || KEYBINDING_DEFAULTS.dit,
          dahKey: localStorage.getItem(STORAGE_KEYS.SETTINGS_DAH_KEY) || KEYBINDING_DEFAULTS.dah,
          wpm: parseInt(localStorage.getItem(STORAGE_KEYS.SETTINGS_WPM), 10) || DEFAULT_WPM
@@ -212,7 +350,6 @@ document.addEventListener('DOMContentLoaded', () => {
      if(initialSettings.ditKey === initialSettings.dahKey) {
         console.warn("Loaded identical keys for Dit and Dah. Resetting Dah to default.");
         initialSettings.dahKey = KEYBINDING_DEFAULTS.dah;
-        // Edge case: If default Dah is ALSO the same as Dit, reset Dit too
         if(initialSettings.ditKey === initialSettings.dahKey) initialSettings.ditKey = KEYBINDING_DEFAULTS.dit;
      }
      if (isNaN(initialSettings.wpm) || initialSettings.wpm <= 0) {
@@ -221,44 +358,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Instantiate Input Modules ---
      const keyingLogicCallbacks = {
-         onInputStart: startGameUpdateTimer, // Use actual function
-         onCharacterDecode: () => gameController.handleCharacterDecode(), // Call game controller method
+         onInputStart: startGameUpdateTimer,
+         onCharacterDecode: () => gameController.handleCharacterDecode(),
          onUpdateUserPattern: (sequence) => uiFacade.getGameScreen()?.updateUserPatternDisplay(sequence),
-         onResultsInput: handleResultsInput // Use actual function
+         onResultsInput: handleResultsInput
      };
 
     const keyingLogic = new KeyingLogic(gameState, morseDecoder, tonePlayer, keyingLogicCallbacks);
     keyingLogic.updateWpm(initialSettings.wpm); // Set initial WPM
 
      const inputHandler = new InputHandler(
-        { // InputHandler Callbacks -> KeyingLogic
+        { // InputHandler Callbacks -> KeyingLogic + Ctrl Toggle
             onDitPress: (method) => keyingLogic.handlePress('dit', method),
             onDahPress: (method) => keyingLogic.handlePress('dah', method),
             onDitRelease: (method) => keyingLogic.handleRelease('dit', method),
-            onDahRelease: (method) => keyingLogic.handleRelease('dah', method)
+            onDahRelease: (method) => keyingLogic.handleRelease('dah', method),
+            onCtrlToggle: handleCtrlToggle // Pass the new handler
         },
         { dit: initialSettings.ditKey, dah: initialSettings.dahKey } // Provide initial keys
     );
 
 
-    // --- Instantiate Settings Manager (NOW we have all dependencies) ---
+    // --- Instantiate Settings Manager ---
     const settingsManager = new SettingsManager({
         morseDecoder,
         tonePlayer,
         sequencePlayer,
-        inputHandler, // Pass the created instance
+        inputHandler,
         uiManagerFacade: uiFacade,
-        gameScreen: uiFacade.getGameScreen(), // Pass gameScreen instance
+        gameScreen: uiFacade.getGameScreen(),
         audioCtxManager,
         settingsModalUI
     });
-    // SettingsManager constructor loads from localStorage and applies settings.
-    // Now that settingsManager exists, update gameController's callback reference
     gameController.callbacks.getCurrentKeyMappings = () => settingsManager.getKeyMappings();
 
 
     // --- Initialize Settings Modal Manager ---
-    // Ensure main menu UI elements are accessible before getting button ID
     const settingsModalTriggerButton = uiFacade.mainMenu?.showSettingsButton;
     if (settingsModalTriggerButton) {
          settingsModalManager = new Modal( // Use correct class name 'Modal'
@@ -266,10 +401,9 @@ document.addEventListener('DOMContentLoaded', () => {
              settingsModalTriggerButton.id,
              'settings-close-button',
              'settings-modal-header',
-             handleShowSettings, // Use defined helper
-             handleHideSettings  // Use defined helper
+             handleShowSettings,
+             handleHideSettings
          );
-         // Also ensure settingsModalUI is initialized if manager is created
          settingsModalUI.updateDisplayValues(settingsManager.getSettings());
     } else {
          console.error("Could not initialize Settings Modal Manager: Trigger button or ID not found.");
@@ -280,56 +414,47 @@ document.addEventListener('DOMContentLoaded', () => {
      const uiCallbacks = {
         onShowMainMenu: showMainMenuScreen,
         onShowLevelSelect: navigateToLevelSelect,
-        onShowSandbox: () => {
-             stopGameUpdateTimer();
-             sequencePlayer.stopPlayback();
-             gameState.reset(); // Reset state for sandbox
-             gameState.currentMode = AppMode.SANDBOX;
-             gameState.status = GameStatus.SANDBOX_INPUT;
-             uiFacade.showSandboxScreen();
-         },
-         onShowPlayback: () => {
-             stopGameUpdateTimer();
-             sequencePlayer.stopPlayback();
-             gameState.reset(); // Reset state for playback
-             gameState.currentMode = AppMode.PLAYBACK;
-             gameState.status = GameStatus.PLAYBACK_INPUT;
-             uiFacade.showPlaybackScreen();
-         },
-         onLevelSelect: (levelId) => {
+        onShowSandbox: navigateToSandboxSetup, // Use updated nav function
+        onShowPlayback: navigateToPlaybackSetup, // Use updated nav function
+        onLevelSelect: (levelId) => {
              console.log(`Main: Level ${levelId} selected.`);
-             settingsManager.applySettings(); // Ensure settings are current
-             audioCtxManager.initializeContext(); // Ensure audio ready
-             gameController.startGameLevel(levelId, 0); // Start first sentence
+             settingsManager.applySettings();
+             audioCtxManager.initializeContext();
+             gameController.startGameLevel(levelId, 0); // This internally calls navigateToGameScreen
          },
          onStartSandbox: () => {
              const sentence = uiFacade.getSandboxScreen()?.getSentence();
-             if (sentence) {
+             if (sentence && sentence.trim()) {
                   settingsManager.applySettings();
                   audioCtxManager.initializeContext();
-                  gameController.startSandboxPractice(sentence);
+                  gameController.startSandboxPractice(sentence); // This internally calls navigateToGameScreen
              } else {
                  alert("Please enter a sentence to practice.");
              }
          },
          onPlaySentence: playSentenceFromInput,
-         onVolumeChange: (vol) => settingsManager.setVolume(vol), // Volume handled directly by SettingsManager
-         onHintToggle: (visible) => settingsManager.setHintVisible(visible), // Hint handled by SettingsManager
+         onVolumeChange: (vol) => settingsManager.setVolume(vol),
+         onHintToggle: (visible) => settingsManager.setHintVisible(visible),
          onSandboxInputChange: updateSandboxPreview,
-         // Settings-related callbacks are handled by settingsModalUI listeners below
     };
 
     // --- Wire Up Event Listeners ---
     uiFacade.addEventListeners(uiCallbacks);
     settingsModalUI.addEventListeners({
-         // Pass callbacks directly to the SettingsManager methods
          onWpmChange: (wpm) => settingsManager.setWpm(wpm),
          onFrequencyChange: (freq) => settingsManager.setFrequency(freq),
          onSoundToggle: (enabled) => settingsManager.setSoundEnabled(enabled),
          onDarkModeToggle: (enabled) => settingsManager.setDarkModeEnabled(enabled),
          onKeyMappingChange: (mappings) => settingsManager.setKeyMappings(mappings),
-         onResetProgress: resetProgress, // Use defined helper
+         onResetProgress: resetProgress,
      });
+
+    // Add global ESC key listener
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            navigateBack();
+        }
+    });
 
     // --- Initial Application State ---
     showMainMenuScreen(); // Show the main menu first
