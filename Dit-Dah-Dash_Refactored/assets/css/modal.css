@@ -163,7 +163,7 @@
 /* Key Input Box */
 .modal-content .key-input {
     padding: 6px 10px;
-    font-family: 'Roboto Mono', monospace;
+    font-family: 'Nunito', sans-serif;
     font-size: 1em;
     text-align: center;
     border: 1px solid var(--key-input-border);

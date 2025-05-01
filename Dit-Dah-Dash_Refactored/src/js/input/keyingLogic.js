@@ -107,7 +107,7 @@ export class KeyingLogic {
 
         // 1. Results Screen Input
         if (status === GameStatus.SHOWING_RESULTS) {
-            console.log(`KeyingLogic: Results Action Triggered by: ${type}`);
+            // console.log(`KeyingLogic: Results Action Triggered by: ${type}`);
             this.tonePlayer.playInputTone(type); // Play feedback tone
             this.callbacks.onResultsInput(type); // Trigger results action callback
             return; // Stop further processing for results screen
@@ -119,8 +119,7 @@ export class KeyingLogic {
 
         if (isGameInputContext) {
              // Ensure audio context is ready (might be first interaction)
-             // This might belong better in InputHandler or main.js on first *any* input
-             // this.tonePlayer.audioCtxManager.initializeContext();
+             this.tonePlayer.audioCtxManager.initializeContext(); // Ensure context is active
 
             // If decoding was scheduled, cancel it because new input is arriving
             if (status === GameStatus.DECODING || this.decoder.decodeTimeoutId !== null) {
@@ -384,6 +383,37 @@ export class KeyingLogic {
              }
          }
 
+         // ---- MODIFICATION START ----
+         // Execute the state check logic immediately instead of using setTimeout
+         const checkStateAfterToneEnd = () => {
+             const isDitActive = this.ditActive;
+             const isDahActive = this.dahActive;
+
+             // If keys are still active, continue the repeat/iambic cycle
+             if (isDitActive || isDahActive) {
+                  // console.log("KeyingLogic: Tone ended, keys still active. Triggering state check."); // Debug
+                  this._processInputStateChange(); // This will schedule the next element if needed
+             }
+             // If no keys active AND nothing was just played from queue, and sequence exists, schedule decode
+             else if (!processedQueueItem && this.gameState.status === GameStatus.TYPING && this.gameState.currentInputSequence) {
+                  // console.log("KeyingLogic: Tone ended, no keys active, no queue processed. Scheduling decode."); // Debug
+                  this._scheduleDecodeAfterDelay();
+             }
+             // If no keys active and sequence is empty, revert to listening
+             else if (this.gameState.status === GameStatus.TYPING && !this.gameState.currentInputSequence) {
+                  this.gameState.status = GameStatus.LISTENING;
+             }
+             // If something *was* played from queue, even if keys are now released, schedule decode
+             else if (processedQueueItem && this.gameState.status === GameStatus.TYPING && this.gameState.currentInputSequence) {
+                 // console.log("KeyingLogic: Tone ended, queue processed. Scheduling decode."); // Debug
+                 this._scheduleDecodeAfterDelay();
+             }
+         };
+
+         checkStateAfterToneEnd();
+         // ---- MODIFICATION END ----
+
+         /* ---- OLD CODE using setTimeout ----
          // Use setTimeout to defer state check slightly, allowing release events to potentially register first
          setTimeout(() => {
              const isDitActive = this.ditActive;
@@ -408,7 +438,8 @@ export class KeyingLogic {
                  // console.log("KeyingLogic: Tone ended, queue processed. Scheduling decode."); // Debug
                  this._scheduleDecodeAfterDelay();
              }
-         }, 1); // Minimal delay
+         }, 1); // Minimal delay (Matches old code)
+         */
      }
 
 
@@ -446,7 +477,8 @@ export class KeyingLogic {
                   // console.log(`KeyingLogic: Decode callback executed, but status is now ${this.gameState.status}. Ignoring decode attempt.`); // Debug
                  // If status changed away from DECODING, ensure state is reasonable (e.g., LISTENING)
                  if(this.gameState.status !== GameStatus.FINISHED && this.gameState.status !== GameStatus.SHOWING_RESULTS) {
-                      this.gameState.status = GameStatus.LISTENING;
+                      // Revert to listening if not finished/showing results
+                       this.gameState.status = GameStatus.LISTENING;
                  }
              }
              // Reset iambic state after decode attempt regardless of outcome
@@ -470,17 +502,3 @@ export class KeyingLogic {
         }
     }
 }
-
-// Example Usage (in main.js):
-// import { KeyingLogic } from './input/keyingLogic.js';
-// // Assuming gameState, morseDecoder, tonePlayer instances exist
-// const keyingLogic = new KeyingLogic(gameState, morseDecoder, tonePlayer, {
-//     onInputStart: () => { /* start UI timer */ },
-//     onCharacterDecode: () => { /* handle char validation */ },
-//     onUpdateUserPattern: (sequence) => uiFacade.getGameScreen().updateUserPatternDisplay(sequence),
-//     onResultsInput: (type) => { /* handle results action */ }
-// });
-// // Then, InputHandler calls keyingLogic methods:
-// // inputHandler.callbacks = {
-// //     onDitPress: (method) => keyingLogic.handlePress('dit', method), ...etc
-// // }

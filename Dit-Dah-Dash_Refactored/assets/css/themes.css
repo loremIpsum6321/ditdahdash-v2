@@ -79,6 +79,7 @@
     --key-input-border: #ccc;
     --key-input-focus-border: var(--button-primary-bg);
     --hint-pulse-animation-duration: 1.5s; /* Duration for one pulse */
+    --font: 'Nunito', sans-serif; /* Ensure consistent font */
 }
 
 .dark-mode {
@@ -172,3 +173,4 @@ input[type="text"], input[type="range"], input[type="checkbox"], button,
 #speaker-icon svg path[id^="speaker-wave-"] {
     transition: display 0s, stroke 0.3s ease;
 }
+

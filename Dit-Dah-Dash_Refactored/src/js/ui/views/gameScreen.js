@@ -168,12 +168,12 @@ export class GameScreen {
                 // Check if the span *still* has 'incorrect' (it might have been updated again)
                 if (charSpan.classList.contains('incorrect')) {
                     charSpan.classList.remove('incorrect');
-                    // Determine what state it should revert to (usually 'current' if it's the active char)
-                    // This logic might need external game state info, ideally passed in or handled by caller.
-                    // For simplicity here, revert to pending if not completed. A 'current' state would be reapplied separately.
-                     if (!charSpan.classList.contains('completed')) {
-                        charSpan.classList.add('pending'); // Default fallback
-                     }
+                    // *** FIX: Revert to 'current' state, not 'pending' ***
+                    charSpan.classList.add('current');
+                    // If hints are visible, restart the pulse check for this character
+                    if (this.isHintVisible) {
+                        this._startHintPulseTimer();
+                    }
                 }
                 this._incorrectCharFlashTimeout = null;
             }, INCORRECT_FLASH_DURATION);

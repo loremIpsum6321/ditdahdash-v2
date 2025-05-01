@@ -11,7 +11,7 @@
 button:not(.menu-nav-button):not(.morse-button):not(.level-button):not(.hint-toggle):not(.modal-close-button) {
     padding: 10px 20px;
     font-size: 1.2em;
-    font-family: 'Roboto Mono', monospace; /* Consistent font */
+    font-family: 'Nunito', sans-serif; /* Consistent font */
     cursor: pointer;
     border: none;
     border-radius: 8px;
@@ -135,7 +135,7 @@ button:disabled {
     color: var(--text-color);
 }
 #playback-input, #sandbox-input {
-    font-family: 'Roboto Mono', monospace;
+    font-family: 'Nunito', sans-serif;
     font-size: 1.3em;
     padding: 8px 12px;
     border: var(--playback-input-border);
@@ -283,7 +283,7 @@ button:disabled {
 }
 .key-input {
     padding: 6px 10px;
-    font-family: 'Roboto Mono', monospace;
+    font-family: 'Nunito', sans-serif;
     font-size: 1em;
     text-align: center;
     border: 1px solid var(--key-input-border);
