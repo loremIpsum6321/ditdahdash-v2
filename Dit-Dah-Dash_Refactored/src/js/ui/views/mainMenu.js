@@ -12,12 +12,14 @@ export class MainMenu {
     constructor() {
         this.mainMenuOverlay = getElementByIdSafe('main-menu-overlay');
         this.startGameButton = getElementByIdSafe('start-game-button');
+        this.startEndlessButton = getElementByIdSafe('start-endless-button'); // Added Endless button reference
         this.showSandboxButton = getElementByIdSafe('show-sandbox-button');
         this.showPlaybackButton = getElementByIdSafe('show-playback-button');
         this.showSettingsButton = getElementByIdSafe('show-settings-button'); // Needed for settings modal trigger
 
-        if (!this.mainMenuOverlay || !this.startGameButton || !this.showSandboxButton || !this.showPlaybackButton || !this.showSettingsButton) {
-            console.error("MainMenu: Could not find all required main menu elements. Check IDs.");
+        if (!this.mainMenuOverlay || !this.startGameButton || !this.startEndlessButton ||
+            !this.showSandboxButton || !this.showPlaybackButton || !this.showSettingsButton) {
+            console.error("MainMenu: Could not find all required main menu elements (including endless). Check IDs.");
         }
     }
 
@@ -47,6 +49,7 @@ export class MainMenu {
      * Adds event listeners to the main menu buttons.
      * @param {object} callbacks - An object containing callback functions for button clicks.
      * @param {function} callbacks.onShowLevelSelect - Called when 'Start Game' is clicked.
+     * @param {function} callbacks.onStartEndless - Called when 'Endless Mode' is clicked.
      * @param {function} callbacks.onShowSandbox - Called when 'Sandbox Mode' is clicked.
      * @param {function} callbacks.onShowPlayback - Called when 'Sentence Playback' is clicked.
      * @param {function} [callbacks.onShowSettings] - Called when 'Settings' is clicked (optional, might be handled by ModalManager).
@@ -59,6 +62,9 @@ export class MainMenu {
 
         if (this.startGameButton && typeof callbacks.onShowLevelSelect === 'function') {
             this.startGameButton.addEventListener('click', callbacks.onShowLevelSelect);
+        }
+        if (this.startEndlessButton && typeof callbacks.onStartEndless === 'function') { // Added listener for Endless button
+            this.startEndlessButton.addEventListener('click', callbacks.onStartEndless);
         }
         if (this.showSandboxButton && typeof callbacks.onShowSandbox === 'function') {
             this.showSandboxButton.addEventListener('click', callbacks.onShowSandbox);
@@ -82,6 +88,7 @@ export class MainMenu {
 // const mainMenu = new MainMenu();
 // mainMenu.addEventListeners({
 //     onShowLevelSelect: () => { /* navigate to level select */ },
+//     onStartEndless: () => { /* start endless mode */ }, // Added callback
 //     onShowSandbox: () => { /* navigate to sandbox */ },
 //     onShowPlayback: () => { /* navigate to playback */ }
 // });

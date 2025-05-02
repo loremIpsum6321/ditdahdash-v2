@@ -29,7 +29,7 @@
 
                  <div id="target-pattern-outer-wrapper">
                      <div id="target-pattern-container" class="pattern-container">
-                        </div>
+                         </div>
                      <button id="toggle-hint-button" class="hint-toggle" title="Toggle Hint Visibility">
                          <svg class="icon-visible" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
@@ -38,18 +38,12 @@
                          <svg class="icon-hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
                             <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
                             <line x1="1" y1="1" x2="23" y2="23"></line>
-                            <!-- <path d="M3 10c4 4 14 4 18 0"></path>
-                           <line x1="6" y1="14" x2="6" y2="17"></line>
-                           <line x1="9" y1="14" x2="9" y2="17"></line>
-                           <line x1="12" y1="14" x2="12" y2="17"></line>
-                           <line x1="15" y1="14" x2="15" y2="17"></line>
-                           <line x1="18" y1="14" x2="18" y2="17"></line> -->
                          </svg>
                      </button>
                  </div>
 
                  <div id="user-pattern-container" class="pattern-container">
-                     </div>
+                      </div>
 
                  <div id="volume-control-area">
                     <input type="range" id="volume-slider" min="0" max="1" step="0.01" value="1">
@@ -68,7 +62,9 @@
                     <div id="accuracy-display">Accuracy: 100.0%</div>
                     <div id="gross-wpm-display">Gross WPM: 0</div>
                  </div>
-            </div> <div id="playback-area" class="hidden">
+            </div>
+
+            <div id="playback-area" class="hidden">
                  <button id="playback-menu-button" class="menu-nav-button" title="Main Menu">☰ Menu</button>
                  <h2>Sentence Playback</h2>
                  <label for="playback-input">Enter text to play:</label>
@@ -89,7 +85,7 @@
             <div id="main-menu-overlay" class="overlay">
                 <h2>Dit-Dah-Dash</h2>
                 <button id="start-game-button">Start Game</button>
-                <button id="show-sandbox-button">Sandbox Mode</button>
+                <button id="start-endless-button">Endless Mode</button> <button id="show-sandbox-button">Sandbox Mode</button>
                 <button id="show-playback-button">Sentence Playback</button>
                 <button id="show-settings-button">Settings ⚙️</button>
             </div>
@@ -138,7 +134,9 @@
                  <input type="range" id="wpm-slider" min="5" max="40" value="20">
 
                  <label for="frequency-slider">Tone (Hz): <span id="frequency-value-display">600</span></label>
-                 <input type="range" id="frequency-slider" min="200" max="1000" value="600"> <div class="key-mapping-row">
+                 <input type="range" id="frequency-slider" min="200" max="1000" value="600">
+
+                 <div class="key-mapping-row">
                     <label for="dit-key-input">Dit Key:</label>
                     <input type="text" id="dit-key-input" class="key-input" readonly placeholder="Click to set" title="Click to set Dit key">
                  </div>
@@ -151,11 +149,11 @@
                      <label for="sound-toggle">Sound:</label>
                      <input type="checkbox" id="sound-toggle" checked>
                  </div>
-
                  <div class="settings-toggle-row">
                      <label for="dark-mode-toggle">Dark Mode:</label>
                      <input type="checkbox" id="dark-mode-toggle">
                  </div>
+
                  <button id="reset-settings-button">Reset Settings</button>
                  <button id="reset-progress-button">Reset Progress</button>
             </div>
@@ -166,8 +164,7 @@
     <script type="module" src="src/js/core/gameState.js"></script>
 
     <script type="module" src="src/js/data/levelsData.js"></script>
-
-    <script type="module" src="src/js/game/morseDecoder.js"></script>
+    <script type="module" src="src/js/game/wordGenerator.js"></script> <script type="module" src="src/js/game/morseDecoder.js"></script>
     <script type="module" src="src/js/game/scoreCalculator.js"></script>
     <script type="module" src="src/js/game/levelManager.js"></script>
     <script type="module" src="src/js/audio/audioContextManager.js"></script>

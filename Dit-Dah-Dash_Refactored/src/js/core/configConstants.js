@@ -1,28 +1,46 @@
-// Dit-Dah-Dash_Refactored/src/js/core/configConstants.js
+/*
 
-/**
- * js/core/configConstants.js
- * --------------------------
- * Core configuration constants for the Dit-Dah-Dash game.
- * Extracted from original config.js. Excludes level data.
- * Includes Morse code mappings, timing defaults, audio defaults,
- * storage keys, keybinding defaults, and UI settings.
- */
+    // Dit-Dah-Dash_Refactored/src/js/core/configConstants.js
 
-// --- Morse Code Mapping ---
+    """
+    js/core/configConstants.js
+    --------------------------
+    Core configuration constants for the Dit-Dah-Dash game.
+    Extracted from original config.js. Excludes level data.
+    Includes Morse code mappings, timing defaults, audio defaults,
+    storage keys, keybinding defaults, and UI settings.
+    """
+
+    // --- Morse Code Mapping ---
+    // Includes letters, numbers, common punctuation, and some prosigns/abbreviations.
+    // Prosigns are represented within angle brackets <> for clarity.
+*/
 export const MORSE_MAP = Object.freeze({
+    // Letters
     '.-': 'A', '-...': 'B', '-.-.': 'C', '-..': 'D', '.': 'E',
     '..-.': 'F', '--.': 'G', '....': 'H', '..': 'I', '.---': 'J',
     '-.-': 'K', '.-..': 'L', '--': 'M', '-.': 'N', '---': 'O',
     '.--.': 'P', '--.-': 'Q', '.-.': 'R', '...': 'S', '-': 'T',
     '..-': 'U', '...-': 'V', '.--': 'W', '-..-': 'X', '-.--': 'Y',
     '--..': 'Z',
+    // Numbers
     '-----': '0', '.----': '1', '..---': '2', '...--': '3', '....-': '4',
     '.....': '5', '-....': '6', '--...': '7', '---..': '8', '----.': '9',
+    // Punctuation
     '.-.-.-': '.', '--..--': ',', '..--..': '?', '.----.': "'", '-.-.--': '!',
     '-..-.': '/', '-.--.': '(', '-.--.-': ')', '.-...': '&', '---...': ':',
     '-.-.-.': ';', '-...-': '=', '.-.-.': '+', '-....-': '-', '..--.-': '_',
-    '.-..-.': '"', '...-..-': '$', '.--.-.': '@'
+    '.-..-.': '"', '...-..-': '$', '.--.-.': '@',
+    // Prosigns / Abbreviations
+    '...---...': '<SOS>', // Distress Signal
+    '.-.-.': '<AR>',    // End of Message / New Page
+    '...-.': '<AS>',    // Wait
+    '-.-.-': '<BT>',    // Pause / Separator (like '=')
+    '.-...': '<CT>',    // Start Copying / Attention (often KA) - Using CT representation
+    '........': '<HH>',  // Error / Correction
+    '-.-': '<KN>',    // Invite Specific Station (often just K) - Use if needed
+    '...-.-': '<SK>',    // End of Contact / End of Work
+    '-.--.' : '<SN>'    // Understood (often VE) - Use if needed
 });
 
 // --- Timing Configuration ---

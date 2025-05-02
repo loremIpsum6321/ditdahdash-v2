@@ -84,13 +84,15 @@ export class UIManagerFacade {
         console.log("UI Facade: Showing Main Menu");
     }
 
+    /** Shows the main game screen UI, used for Game, Sandbox, and Endless modes. */
     showGameScreen() {
         this._hideAllViews();
         this.gameScreen.show();
         this.paddleControls.updatePaddleLabels('game'); // Set paddle labels for game mode
         this._setInputAreaVisibility(true); // Show paddles for game
         this.activeView = this.gameScreen;
-        console.log("UI Facade: Showing Game Screen");
+        // Log specific mode later when setting up listeners/state
+        console.log("UI Facade: Showing Game Screen (for Game/Sandbox/Endless)");
     }
 
     showPlaybackScreen() {
@@ -124,6 +126,7 @@ export class UIManagerFacade {
 
     /**
      * Shows the results screen, populates it, and configures paddles.
+     * Note: Results screen is typically NOT shown for Endless mode.
      * @param {object} scores - Calculated scores.
      * @param {number | null} unlockedLevelId - ID of unlocked level, if any.
      * @param {boolean} hasNextLevelOption - If 'Next' option is valid.
@@ -131,6 +134,14 @@ export class UIManagerFacade {
      * @param {object} keyMappings - Current key mappings for hints.
      */
     showResultsScreen(scores, unlockedLevelId, hasNextLevelOption, mode, keyMappings) {
+        // Do not show results for Endless mode
+        if (mode === AppMode.ENDLESS) {
+             console.log("UI Facade: Skipping results screen for Endless mode.");
+             // Potentially navigate somewhere else, like main menu? Or just stay?
+             // For now, we assume the GameController handles the flow for Endless.
+             return;
+        }
+
         this._hideAllViews();
         this.resultsScreen.show(scores, unlockedLevelId, hasNextLevelOption, mode, keyMappings);
         this.paddleControls.updatePaddleLabels('results', hasNextLevelOption, mode); // Set paddle labels for results
@@ -172,6 +183,7 @@ export class UIManagerFacade {
          // Call addEventListeners on each view module, passing relevant callbacks
          this.mainMenu.addEventListeners({
              onShowLevelSelect: callbacks.onShowLevelSelect,
+             onStartEndless: callbacks.onStartEndless, // Added Endless callback
              onShowSandbox: callbacks.onShowSandbox,
              onShowPlayback: callbacks.onShowPlayback,
              // onShowSettings handled by ModalManager instance setup in main.js
@@ -222,6 +234,7 @@ export class UIManagerFacade {
 // // Setup all callbacks needed by ANY view module
 // const uiCallbacks = {
 //      onShowLevelSelect: () => { /* show level select logic */ },
+//      onStartEndless: () => { /* start endless mode logic */ }, // Add callback
 //      onShowSandbox: () => { /* show sandbox logic */ },
 //      // ... all other callbacks ...
 //      onShowMainMenu: () => uiFacade.showMainMenu(),

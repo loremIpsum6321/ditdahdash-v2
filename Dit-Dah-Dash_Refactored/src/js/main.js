@@ -7,6 +7,7 @@ import { STORAGE_KEYS, KEYBINDING_DEFAULTS, DEFAULT_WPM } from './core/configCon
 
 // Data & Config
 // import { LEVELS_DATA } from './data/levelsData.js'; // Not directly needed here
+import { WordGenerator } from './game/wordGenerator.js'; // Import WordGenerator
 
 // Game Logic Modules
 import { MorseDecoder } from './game/morseDecoder.js';
@@ -54,6 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const morseDecoder = new MorseDecoder();
     const levelManager = new LevelManager();
     const scoreCalculator = new ScoreCalculator();
+    const wordGenerator = new WordGenerator(); // Instantiate WordGenerator
 
     // --- Instantiate Audio Modules ---
     const audioCtxManager = new AudioContextManager();
@@ -90,7 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
             gameScreen.updateTimer(gameState.getCurrentElapsedTime());
             // Note: WPM/Accuracy calculation for live update is complex.
             // For now, we only update the timer display.
-            // Actual WPM/Acc are calculated at the end.
+            // Actual WPM/Acc are calculated at the end (Game/Sandbox).
             lastUpdateTime = now;
         }, 100); // Update UI ~10 times/sec
     }
@@ -109,7 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log("Main: Navigating to Level Select.");
         const levels = levelManager.getAllLevelsWithStatus();
         uiFacade.showLevelSelectScreen(levels);
-        gameState.currentMode = AppMode.GAME; // Assume starting game unless sandbox chosen
+        gameState.currentMode = AppMode.GAME; // Set mode to GAME
         gameState.status = GameStatus.LEVEL_SELECT;
         pushHistory('levelSelect'); // Update history
     }
@@ -136,15 +138,27 @@ document.addEventListener('DOMContentLoaded', () => {
         pushHistory('playback'); // Update history
     }
 
-     /** Navigates to the Game/Sandbox screen (called after level/sentence is chosen). */
+    /** Navigates to Endless Mode screen. */
+    function navigateToEndlessMode() {
+        console.log("Main: Navigating to Endless Mode.");
+        stopGameUpdateTimer();
+        sequencePlayer.stopPlayback();
+        gameState.reset(); // Reset state before starting endless
+        settingsManager.applySettings(); // Ensure current settings are applied
+        audioCtxManager.initializeContext(); // Ensure audio is ready
+        gameController.startEndlessMode(); // GameController handles state setup and UI call
+        pushHistory('endless'); // Update history
+    }
+
+     /** Navigates to the Game/Sandbox/Endless screen (called after level/sentence is chosen). */
      function navigateToGameScreen() {
-         // Called by gameController.startGameLevel or gameController.startSandboxPractice
+         // Called by gameController.startGameLevel, startSandboxPractice, or startEndlessMode
          uiFacade.showGameScreen();
-         // History is pushed based on whether we came from level select ('game') or sandbox setup ('sandboxPractice')
-         if (gameState.currentMode === AppMode.GAME) {
-             pushHistory('game');
-         } else if (gameState.currentMode === AppMode.SANDBOX) {
-             pushHistory('sandboxPractice');
+         // History is pushed based on the mode set by the gameController methods
+         switch (gameState.currentMode) {
+             case AppMode.GAME: pushHistory('game'); break;
+             case AppMode.SANDBOX: pushHistory('sandboxPractice'); break;
+             case AppMode.ENDLESS: pushHistory('endlessPractice'); break; // Use a distinct history state?
          }
      }
 
@@ -169,11 +183,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (type === 'dit') { // Retry
             console.log("Main: Results Retry selected.");
-            gameController.retryCurrent(); // This will call navigateToGameScreen internally
+            gameController.retryCurrent(); // Handles Game/Sandbox retry
         } else if (type === 'dah') { // Next
             // Check if 'Next' is actually enabled (handled by GameController)
             console.log("Main: Results Next selected.");
-            gameController.proceedToNext(); // This might call navigateToLevelSelect or navigateToGameScreen
+            gameController.proceedToNext(); // Handles Game next, or exit for Sandbox
         }
     }
 
@@ -242,18 +256,15 @@ document.addEventListener('DOMContentLoaded', () => {
         switch(previousState) {
             case 'game':
             case 'sandboxPractice':
-                 // If game was paused, resume it here. For now, just set status back.
-                 // We need to know the exact status *before* settings opened.
-                 // This simple history doesn't store that fine-grained state.
-                 // A simple approach: If game was active, revert to LISTENING.
+            case 'endless': // Added Endless check
+            case 'endlessPractice':
+                 // If game was active, revert to LISTENING (or previous state).
                  if (gameState.isPlaying() || gameState.status === GameStatus.READY) {
                       gameState.status = GameStatus.LISTENING;
                  } else if (gameState.status === GameStatus.FINISHED || gameState.status === GameStatus.SHOWING_RESULTS) {
-                     // Keep results status if settings opened from results
                      gameState.status = GameStatus.SHOWING_RESULTS;
                  } else {
-                      // Fallback if unsure
-                       gameState.status = GameStatus.LISTENING;
+                      gameState.status = GameStatus.LISTENING;
                  }
                  break;
             case 'levelSelect': gameState.status = GameStatus.LEVEL_SELECT; break;
@@ -266,26 +277,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
      /** Handles Control key press/release for hint peeking/hiding. */
      function handleCtrlToggle(isPressed) {
-        console.log(`[main.handleCtrlToggle] Called with isPressed = ${isPressed}`); // DEBUG
-        // Only handle if game is active
+        // Only handle if game is active (any playable mode)
         if (!gameState.isPlaying()) {
-            console.log("[main.handleCtrlToggle] Skipping: gameState not playing."); // DEBUG
             return;
         }
 
         if (isPressed) {
-            // Store current state and show hint if it was hidden
             hintStateBeforeCtrl = settingsManager.getSettings().hintVisible;
-            console.log(`[main.handleCtrlToggle] Current hint state: ${hintStateBeforeCtrl}`); // DEBUG
             if (!hintStateBeforeCtrl) {
-                console.log("[main.handleCtrlToggle] Hint was hidden, calling setHintVisible(true)..."); // DEBUG
                 settingsManager.setHintVisible(true);
-            } else {
-                 console.log("[main.handleCtrlToggle] Hint already visible, doing nothing on press."); // DEBUG
             }
         } else {
-            // On release, always hide the hint (peek or shortcut hide)
-            console.log("[main.handleCtrlToggle] Control released, calling setHintVisible(false)..."); // DEBUG
             settingsManager.setHintVisible(false);
             hintStateBeforeCtrl = null; // Reset stored state
         }
@@ -301,21 +303,31 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // 2. Check history stack
+        // 2. Handle specific back navigation from active game modes
+        if (gameState.isPlaying() || gameState.status === GameStatus.SHOWING_RESULTS) {
+             if (confirm("Exit current session and return to the main menu?")) {
+                 showMainMenuScreen(); // Exit active game/results directly to menu
+                 return;
+             } else {
+                 return; // User cancelled exit
+             }
+        }
+
+        // 3. Check history stack for other screens
         if (navigationHistory.length <= 1) {
             console.log("Navigate Back: Already at main menu.");
             return; // Can't go back further than menu
         }
 
-        // 3. Pop current state and get previous state
+        // 4. Pop current state and get previous state
         navigationHistory.pop();
         const previousState = navigationHistory.at(-1);
         // console.log("Navigate Back: Target State =", previousState, "History:", navigationHistory); // Debug
 
-        // 4. Navigate to the previous state
+        // 5. Navigate to the previous state (non-game screens)
         switch (previousState) {
             case 'levelSelect':
-                navigateToLevelSelect(); // This function handles its own history push, but it won't push if already last item
+                navigateToLevelSelect();
                 break;
             case 'sandbox':
                 navigateToSandboxSetup();
@@ -323,13 +335,13 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'playback':
                 navigateToPlaybackSetup();
                 break;
+            case 'endless': // Navigating back *from* endless practice goes to menu
+                 showMainMenuScreen();
+                 break;
             case 'menu':
             default:
                 showMainMenuScreen(); // This resets history to ['menu']
                 break;
-            // Note: 'game' or 'sandboxPractice' are not typically navigated *back* to via ESC,
-            // usually you go back *from* them to levelSelect/sandbox/menu.
-            // If settings were open during game, handleHideSettings manages status recovery.
         }
     }
 
@@ -337,6 +349,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Instantiate Game Controller ---
     const gameController = new GameController(
         gameState, levelManager, scoreCalculator, morseDecoder, tonePlayer, uiFacade,
+        wordGenerator, // Pass word generator
          { // Callbacks for GameController
              onGameEndShowMainMenu: showMainMenuScreen,
              onGameEndShowLevelSelect: navigateToLevelSelect, // Use updated nav function
@@ -419,6 +432,7 @@ document.addEventListener('DOMContentLoaded', () => {
      const uiCallbacks = {
         onShowMainMenu: showMainMenuScreen,
         onShowLevelSelect: navigateToLevelSelect,
+        onStartEndless: navigateToEndlessMode, // Added Endless callback
         onShowSandbox: navigateToSandboxSetup, // Use updated nav function
         onShowPlayback: navigateToPlaybackSetup, // Use updated nav function
         onLevelSelect: (levelId) => {
@@ -452,8 +466,7 @@ document.addEventListener('DOMContentLoaded', () => {
          onDarkModeToggle: (enabled) => settingsManager.setDarkModeEnabled(enabled),
          onKeyMappingChange: (mappings) => settingsManager.setKeyMappings(mappings),
          onResetProgress: resetProgress,
-         onResetProgress: resetProgress,
-         onResetSettings: handleResetSettings
+         onResetSettings: handleResetSettings // Connect reset settings button
      });
 
     // Add global ESC key listener
@@ -466,7 +479,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Initial Application State ---
     showMainMenuScreen(); // Show the main menu first
     console.log("Dit-Dah-Dash Refactored Initialized.");
-    
+
     /** Resets configurable settings to defaults. */
     function handleResetSettings() {
         if (confirm("Reset all appearance and input settings (WPM, keys, volume, theme, paddle textures, etc.) to their defaults? Game progress will not be affected.")) {

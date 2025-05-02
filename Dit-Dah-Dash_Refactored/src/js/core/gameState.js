@@ -6,7 +6,7 @@ import { GameStatus, AppMode } from './appStatus.js';
  * js/core/gameState.js
  * ---------------
  * Manages the state of the application, including game progress, playback state,
- * timing, current input, and mode (Game, Sandbox, Playback, Menu, Settings).
+ * timing, current input, and mode (Game, Sandbox, Playback, Menu, Settings, Endless).
  * Imports status and mode enums from appStatus.js.
  */
 
@@ -24,26 +24,32 @@ export class GameState {
      reset() {
         this.status = GameStatus.IDLE; // Start as idle, main.js will set to MENU
         this.currentMode = AppMode.MENU; // Track the mode
-        // Game/Sandbox-specific state
-        this.currentLevelId = null;     // null in sandbox mode
-        this.currentSentenceIndex = 0;  // 0 in sandbox mode
-        this.currentSentence = "";
-        this.totalCharsInSentence = 0; // Total non-space characters
+
+        // --- Game/Sandbox/Endless-specific state ---
+        this.currentLevelId = null;     // null in sandbox/endless mode
+        this.currentSentenceIndex = 0;  // 0 in sandbox/endless mode
+        this.currentSentence = "";      // The text being typed (can be appended to in Endless)
+        this.totalCharsInSentence = 0;  // Total non-space characters (updated dynamically in Endless)
         this.currentCharIndex = 0;
         this.startTime = 0;
         this.endTime = 0;
         this.elapsedTime = 0;
-        this.correctChars = 0;
+        this.correctChars = 0;          // Correct non-space chars in the current session
         this.incorrectAttempts = 0;
-        this.totalInputs = 0; // Game/Sandbox inputs
+        this.totalInputs = 0;           // All dit/dah inputs in the current session
 
-        // Input tracking state
+        // --- Input tracking state ---
         this.currentInputSequence = ""; // Morse sequence during gameplay (.,-)
         this.inputTimestamps = [];
         this.lastInputTime = 0;
         this.characterTimeoutId = null; // For game decoding timer
         this.isIambicHandling = false;
         this.iambicState = null; // 'dit' or 'dah'
+
+        // --- Endless Mode State ---
+        this.wordsCompletedCount = 0;    // Total words completed in Endless mode
+        this.currentWordChunk = [];      // Array of words currently being typed in Endless
+        this.wordsCompletedInChunk = 0;  // Words completed since last word generation
 
         console.log("Application state reset.");
     }
@@ -69,6 +75,7 @@ export class GameState {
         this.currentInputSequence = "";
         this.inputTimestamps = []; this.lastInputTime = 0; this.characterTimeoutId = null;
         this.isIambicHandling = false; this.iambicState = null;
+        this.wordsCompletedCount = 0; this.currentWordChunk = []; this.wordsCompletedInChunk = 0; // Reset endless state
 
         this._skipLeadingSpaces();
         this.status = GameStatus.READY; // Set state after setup
@@ -92,10 +99,38 @@ export class GameState {
         this.currentInputSequence = "";
         this.inputTimestamps = []; this.lastInputTime = 0; this.characterTimeoutId = null;
         this.isIambicHandling = false; this.iambicState = null;
+        this.wordsCompletedCount = 0; this.currentWordChunk = []; this.wordsCompletedInChunk = 0; // Reset endless state
 
         this._skipLeadingSpaces();
         this.status = GameStatus.READY; // Set state after setup
         console.log(`Starting Sandbox. Mode: ${this.currentMode}, Status: ${this.status}`);
+    }
+
+    /**
+     * Sets up the game state for ENDLESS mode.
+     * @param {Array<string>} initialWords - The first batch of words.
+     */
+    startEndlessMode(initialWords) {
+        this.currentMode = AppMode.ENDLESS;
+        this.currentLevelId = null;
+        this.currentSentenceIndex = 0;
+        this.currentSentence = initialWords.join(' '); // Start with initial words
+        this.totalCharsInSentence = this.currentSentence.split('').filter(char => char !== ' ').length;
+        this.currentCharIndex = 0;
+        this.startTime = 0; this.endTime = 0; this.elapsedTime = 0;
+        this.correctChars = 0; this.incorrectAttempts = 0; this.totalInputs = 0;
+        this.currentInputSequence = "";
+        this.inputTimestamps = []; this.lastInputTime = 0; this.characterTimeoutId = null;
+        this.isIambicHandling = false; this.iambicState = null;
+
+        // Endless specific state
+        this.wordsCompletedCount = 0;
+        this.currentWordChunk = [...initialWords]; // Store the current words
+        this.wordsCompletedInChunk = 0;
+
+        this._skipLeadingSpaces();
+        this.status = GameStatus.READY;
+        console.log(`Starting Endless Mode. Mode: ${this.currentMode}, Status: ${this.status}`);
     }
 
     /** Skips leading spaces in the current sentence. */
@@ -105,7 +140,7 @@ export class GameState {
         }
     }
 
-     /** Starts the game/sandbox timer if status is READY. */
+     /** Starts the game/sandbox/endless timer if status is READY. */
      startTimer() {
         if (this.status === GameStatus.READY) {
             this.startTime = performance.now();
@@ -117,8 +152,17 @@ export class GameState {
         return false;
      }
 
-    /** Stops the game/sandbox timer and sets status to FINISHED. */
+    /** Stops the game/sandbox/endless timer and sets status to FINISHED. */
     stopTimer() {
+        // In Endless mode, the timer doesn't stop normally, only on exit.
+        if (this.currentMode === AppMode.ENDLESS) {
+            console.log("Timer stop requested in Endless Mode - typically only happens on exit.");
+            this.status = GameStatus.FINISHED; // Or maybe MENU if exiting?
+            this.endTime = performance.now();
+            this.elapsedTime = this.endTime - this.startTime;
+            return true;
+        }
+
         if (this.startTime > 0 && this.status !== GameStatus.FINISHED && this.status !== GameStatus.SHOWING_RESULTS) {
             this.endTime = performance.now();
             this.elapsedTime = this.endTime - this.startTime;
@@ -132,12 +176,12 @@ export class GameState {
         return false;
     }
 
-    /** Updates the game/sandbox input sequence. */
+    /** Updates the game/sandbox/endless input sequence. */
     addInput(input) {
         const now = performance.now();
         // Only count inputs if actually in a playing state
         if (this.isPlaying() || this.status === GameStatus.READY) { // Adjusted check for READY
-            this.totalInputs++; // Track game/sandbox inputs
+            this.totalInputs++; // Track game/sandbox/endless inputs
         }
         this.inputTimestamps.push({ input, time: now });
         this.lastInputTime = now;
@@ -157,18 +201,14 @@ export class GameState {
         // Note: Logic for results screen input removed as per refactor goals.
     }
 
-    /** Clears the current game/sandbox input sequence. */
+    /** Clears the current game/sandbox/endless input sequence. */
     clearCurrentInput() {
         // console.log(`Clearing input sequence. Was: '${this.currentInputSequence}'`); // Debug
         this.currentInputSequence = "";
         this.inputTimestamps = [];
         this.clearCharacterTimeout();
 
-        // UI update is responsibility of UI modules calling this, not gameState itself
-        // e.g., window.morseUIManager.updateUserPatternDisplay("");
-        // e.g., window.morseUIManager.setPatternDisplayState('default');
-
-        // Reset to listening state only if actively playing game/sandbox characters
+        // Reset to listening state only if actively playing
         if (this.isPlaying()) {
             // console.log("Setting status to LISTENING after clearing input."); // Debug
             this.status = GameStatus.LISTENING;
@@ -189,38 +229,81 @@ export class GameState {
         }
     }
 
-    /** Advances to the next game/sandbox character. Returns true if more chars exist, false if sentence complete. */
+    /**
+     * Advances to the next game/sandbox/endless character.
+     * Handles word completion checks for Endless mode.
+     * Returns true if more chars exist, false if sentence complete (Game/Sandbox only).
+     */
     moveToNextCharacter() {
+        const previousCharIndex = this.currentCharIndex;
+        const previousChar = this.currentSentence[previousCharIndex];
+
         this.correctChars++;
         this.currentCharIndex++;
+
+        // --- Word Completion Check (Endless Mode) ---
+        // Check if the completed character was a space
+        if (this.currentMode === AppMode.ENDLESS && previousChar === ' ') {
+            this.wordsCompletedInChunk++;
+            this.wordsCompletedCount++;
+            console.log(`Endless: Word completed. Chunk: ${this.wordsCompletedInChunk}, Total: ${this.wordsCompletedCount}`);
+            // Trigger word generation check (logic handled in GameController)
+            // This function only tracks completion.
+        }
+
+        // Skip any subsequent spaces
         while (this.currentCharIndex < this.currentSentence.length && this.currentSentence[this.currentCharIndex] === ' ') {
             this.currentCharIndex++;
         }
+
         this.clearCurrentInput(); // Clears sequence, potentially sets state to LISTENING
 
+        // Check if end of sentence reached
         if (this.currentCharIndex >= this.currentSentence.length) {
-            this.stopTimer(); // Sets status to FINISHED
-            console.log("Sentence finished!");
-            return false; // No more characters
+            // In Endless mode, this means we need more words (handled by GameController)
+            // In Game/Sandbox, this signals the end.
+            if (this.currentMode === AppMode.GAME || this.currentMode === AppMode.SANDBOX) {
+                this.stopTimer(); // Sets status to FINISHED
+                console.log("Sentence finished!");
+                return false; // No more characters (for Game/Sandbox)
+            } else {
+                 // In Endless mode, reaching the end doesn't stop the timer or mark as finished.
+                 // The GameController will handle adding more words.
+                 // We still return true because the *mode* continues.
+                 console.log("Endless: Reached end of current sentence chunk.");
+                 return true; // More characters expected (will be added)
+            }
         } else {
+            // More characters remain in the current sentence
             // console.log(`Moved to character index: ${this.currentCharIndex} ('${this.getTargetCharacter()}')`); // Debug
-            // clearCurrentInput should have set state to LISTENING if appropriate
             return true; // More characters remain
         }
     }
 
+    /** Appends new words to the sentence in Endless Mode. */
+    appendEndlessWords(newWords) {
+        if (this.currentMode !== AppMode.ENDLESS || !newWords || newWords.length === 0) {
+            return false;
+        }
+        const newSentencePart = " " + newWords.join(' '); // Add space separator
+        this.currentSentence += newSentencePart;
+        this.totalCharsInSentence += newSentencePart.split('').filter(char => char !== ' ').length; // Update total chars
+        this.currentWordChunk.push(...newWords); // Add to the internal chunk list (optional)
+        console.log(`Endless: Appended ${newWords.length} words.`);
+        return true;
+    }
 
-    /** Records an incorrect game/sandbox attempt. */
+
+    /** Records an incorrect game/sandbox/endless attempt. */
     registerIncorrectAttempt() {
         this.incorrectAttempts++;
         console.log("Incorrect attempt registered. Total:", this.incorrectAttempts);
     }
 
-    /** Checks if the game is in an active playing state (input matters for game/sandbox). */
+    /** Checks if the game is in an active playing state (input matters for game/sandbox/endless). */
     isPlaying() {
-        // *** MODIFIED: Added GameStatus.READY to the check ***
-        return (this.currentMode === AppMode.GAME || this.currentMode === AppMode.SANDBOX) &&
-               (this.status === GameStatus.READY || // Allow interaction when level is ready
+        return (this.currentMode === AppMode.GAME || this.currentMode === AppMode.SANDBOX || this.currentMode === AppMode.ENDLESS) &&
+               (this.status === GameStatus.READY ||
                 this.status === GameStatus.LISTENING ||
                 this.status === GameStatus.TYPING ||
                 this.status === GameStatus.DECODING);
@@ -231,39 +314,38 @@ export class GameState {
          return this.currentMode === AppMode.PLAYBACK && this.status === GameStatus.PLAYING_BACK;
      }
 
-    /** Gets the target game/sandbox character (uppercase or space). */
+    /** Gets the target game/sandbox/endless character (uppercase or space). */
     getTargetCharacter() {
-        const targetStates = [GameStatus.READY, GameStatus.LISTENING, GameStatus.TYPING, GameStatus.DECODING];
-        if ((this.currentMode === AppMode.GAME || this.currentMode === AppMode.SANDBOX) &&
-            targetStates.includes(this.status) && this.currentCharIndex < this.currentSentence.length) {
+        if (this.isPlaying() && this.currentCharIndex < this.currentSentence.length) {
              const char = this.currentSentence[this.currentCharIndex];
              return char === ' ' ? ' ' : char.toUpperCase();
         } return null;
     }
 
-     /** Gets the target game/sandbox character (raw case). */
+     /** Gets the target game/sandbox/endless character (raw case). */
      getTargetCharacterRaw() {
-         const targetStates = [GameStatus.READY, GameStatus.LISTENING, GameStatus.TYPING, GameStatus.DECODING];
-          if ((this.currentMode === AppMode.GAME || this.currentMode === AppMode.SANDBOX) &&
-              targetStates.includes(this.status) && this.currentCharIndex < this.currentSentence.length) {
+          if (this.isPlaying() && this.currentCharIndex < this.currentSentence.length) {
              return this.currentSentence[this.currentCharIndex];
          } return null;
      }
 
-    /** Gets the current calculated elapsed game/sandbox time. */
+    /** Gets the current calculated elapsed game/sandbox/endless time. */
     getCurrentElapsedTime() {
         if (this.startTime === 0) return 0;
+        // In Endless mode, only stopTimer called on exit, so always calculate current time
+        if (this.currentMode === AppMode.ENDLESS) {
+             return performance.now() - this.startTime;
+        }
+        // Handle Game/Sandbox finish states
         if (this.status === GameStatus.FINISHED || this.status === GameStatus.SHOWING_RESULTS) {
-            // Ensure endTime is set if finished
-             if (this.endTime === 0 && this.status === GameStatus.FINISHED) {
-                  this.endTime = performance.now();
-                  this.elapsedTime = this.endTime - this.startTime;
-             }
+            if (this.endTime === 0 && this.status === GameStatus.FINISHED) {
+                 this.endTime = performance.now();
+                 this.elapsedTime = this.endTime - this.startTime;
+            }
             return this.elapsedTime;
         }
-        // Also include READY state for time calculation if needed, although timer starts on first input
-        if (this.isPlaying()) { // isPlaying now includes READY
-            // If READY but timer not started, return 0. Otherwise, return time since start.
+        // Calculate current time if playing
+        if (this.isPlaying()) {
             return this.startTime > 0 ? (performance.now() - this.startTime) : 0;
         }
 

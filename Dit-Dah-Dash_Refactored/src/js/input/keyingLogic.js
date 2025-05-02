@@ -10,6 +10,8 @@ import { DEFAULT_WPM, DIT_DURATION_UNITS, DAH_DURATION_UNITS, INTRA_CHARACTER_GA
  * Implements timing, auto-repeat, Iambic B keying, triggers audio tones,
  * manages game state transitions related to input, and schedules decoding.
  * Relies on GameState, MorseDecoder, and TonePlayer.
+ *
+ * Refined for smoother input feel, better queuing, and transitions.
  */
 
 export class KeyingLogic {
@@ -50,7 +52,8 @@ export class KeyingLogic {
         this.pressStartTime = { dit: 0, dah: 0 }; // Track initial press time for iambic start logic
         this.lastInputTypeGenerated = null; // 'dit' or 'dah'
         this.lastEmitTime = 0; // performance.now() timestamp of last tone *start*
-        this.queuedInput = null; // 'dit' or 'dah' if audio is busy
+        // --- Use an array for the queue ---
+        this.inputQueue = []; // FIFO queue for inputs delayed by audio playback
         this.repeatOrIambicTimerId = null; // Timer for next element generation
 
         this._calculateTimings(this.wpm); // Initial calculation
@@ -113,7 +116,7 @@ export class KeyingLogic {
             return; // Stop further processing for results screen
         }
 
-        // 2. Game/Sandbox Input
+        // 2. Game/Sandbox/Endless Input
         const isGameInputContext = (status === GameStatus.READY || status === GameStatus.LISTENING ||
                                     status === GameStatus.TYPING || status === GameStatus.DECODING);
 
@@ -121,9 +124,9 @@ export class KeyingLogic {
              // Ensure audio context is ready (might be first interaction)
              this.tonePlayer.audioCtxManager.initializeContext(); // Ensure context is active
 
-            // If decoding was scheduled, cancel it because new input is arriving
-            if (status === GameStatus.DECODING || this.decoder.decodeTimeoutId !== null) {
-                 // console.log("KeyingLogic: Cancelling scheduled decode due to new press."); // Debug
+             // If decoding was scheduled, cancel it because new input is arriving
+             if (status === GameStatus.DECODING || this.decoder.decodeTimeoutId !== null) {
+                 // console.log("[DBG] KeyingLogic: Cancelling scheduled decode due to new press.");
                  this.decoder.cancelScheduledDecode();
                  this.gameState.status = GameStatus.TYPING; // Revert to typing state
                  if (this.gameState.characterTimeoutId) this.gameState.clearCharacterTimeout(); // Clear state's ref too
@@ -156,30 +159,23 @@ export class KeyingLogic {
                                     status === GameStatus.TYPING || status === GameStatus.DECODING);
 
         if (isGameInputContext) {
-             // If a tone just finished playing and something was queued, the release might allow processing
-             // Check if queue has items and audio is now free
-             if (this.queuedInput !== null && this.tonePlayer.inputToneNode === null) {
-                 // console.log("KeyingLogic: Release detected queue processing opportunity."); // Debug
-                 this._handleToneEnd(); // Try processing queue
-             }
-
             // Re-evaluate the input state (might stop iambic/repeat or schedule decode)
             this._processInputStateChange();
         }
         // No specific action needed on release for results screen
     }
 
-    /** Central logic to determine input mode (gameplay/sandbox only) and manage timers/state. */
+    /** Central logic to determine input mode (gameplay only) and manage timers/state. */
     _processInputStateChange() {
         const status = this.gameState.status;
-        const isGameInputContext = (status === GameStatus.READY || status === GameStatus.LISTENING ||
-                                    status === GameStatus.TYPING || status === GameStatus.DECODING);
+        // Check if playing game/sandbox/endless
+        const isGameInputContext = this.gameState.isPlaying();
 
         // If not in a state where keying matters, clear timers and state
         if (!isGameInputContext) {
            this._clearRepeatOrIambicTimer();
            this.lastEmitTime = 0;
-           this.queuedInput = null;
+           this.inputQueue = []; // Clear queue
            this.gameState.isIambicHandling = false;
            this.gameState.iambicState = null;
            return;
@@ -206,7 +202,7 @@ export class KeyingLogic {
             // Set initial iambic element based on which key was pressed first *if* state is new
             if (this.gameState.iambicState === null) {
                  this.gameState.iambicState = (this.pressStartTime.dah > this.pressStartTime.dit) ? 'dah' : 'dit';
-                 // console.log(`KeyingLogic: Starting Iambic B, initial element: ${this.gameState.iambicState}`); // Debug
+                 // console.log(`[DBG] KeyingLogic: Starting Iambic B, initial element: ${this.gameState.iambicState}`);
             }
             this._triggerRepeatOrIambicOutput(); // Start/continue iambic output
 
@@ -214,7 +210,7 @@ export class KeyingLogic {
             // --- Dit Only Mode ---
             if (this.gameState.isIambicHandling) { // If switching from iambic
                 this.gameState.iambicState = 'dit'; // Set next element to dit
-                 // console.log(`KeyingLogic: Switching from Iambic to Dit only.`); // Debug
+                 // console.log(`[DBG] KeyingLogic: Switching from Iambic to Dit only.`);
             } else if (this.gameState.iambicState === null) { // If first press or after pause
                 this.gameState.iambicState = 'dit';
             }
@@ -225,7 +221,7 @@ export class KeyingLogic {
              // --- Dah Only Mode ---
              if (this.gameState.isIambicHandling) { // If switching from iambic
                  this.gameState.iambicState = 'dah';
-                 // console.log(`KeyingLogic: Switching from Iambic to Dah only.`); // Debug
+                 // console.log(`[DBG] KeyingLogic: Switching from Iambic to Dah only.`);
              } else if (this.gameState.iambicState === null) { // If first press or after pause
                  this.gameState.iambicState = 'dah';
              }
@@ -238,10 +234,11 @@ export class KeyingLogic {
              this.gameState.iambicState = null; // Clear iambic state
              // If user just finished typing a sequence and audio is free, schedule decode
              if (this.gameState.currentInputSequence &&
-                 (status === GameStatus.TYPING || status === GameStatus.LISTENING) && // Allow scheduling from LISTENING if sequence exists somehow
-                 this.queuedInput === null && this.tonePlayer.inputToneNode === null)
+                 (status === GameStatus.TYPING || status === GameStatus.LISTENING) &&
+                 this.inputQueue.length === 0 && // Check queue is empty
+                 this.tonePlayer.inputToneNode === null)
              {
-                 // console.log("KeyingLogic: No keys active, scheduling decode."); // Debug
+                 // console.log("[DBG] KeyingLogic: No keys active, scheduling decode.");
                  this._scheduleDecodeAfterDelay();
              }
              // If state was TYPING but sequence is now empty (cleared by decode/moveNext), revert to LISTENING
@@ -283,7 +280,7 @@ export class KeyingLogic {
 
         if (!shouldContinueCurrentMode) {
             // If keys released don't match mode, re-evaluate state immediately
-            // console.log(`KeyingLogic: Key release detected, mode ${this.gameState.isIambicHandling ? 'Iambic' : 'Single'} no longer valid. Re-evaluating.`); // Debug
+            // console.log(`[DBG] KeyingLogic: Key release detected, mode ${this.gameState.isIambicHandling ? 'Iambic' : 'Single'} no longer valid. Re-evaluating.`);
             this._processInputStateChange();
             return;
         }
@@ -299,18 +296,17 @@ export class KeyingLogic {
         if (this.lastEmitTime > 0 && timeSinceLastEmit < requiredTimeMs) {
             // Not enough time passed, schedule check slightly later
             const remainingTimeMs = requiredTimeMs - timeSinceLastEmit;
-            // console.log(`KeyingLogic: Waiting ${remainingTimeMs.toFixed(0)}ms for intra-char gap.`); // Debug
+            // console.log(`[DBG] KeyingLogic: Waiting ${remainingTimeMs.toFixed(0)}ms for intra-char gap.`);
             this.repeatOrIambicTimerId = setTimeout(() => this._triggerRepeatOrIambicOutput(), Math.max(5, remainingTimeMs));
             return;
         }
 
         // Check audio queue: Is the tone player busy?
         if (this.tonePlayer.inputToneNode !== null) {
-             if (this.queuedInput === null) {
-                 this.queuedInput = elementToSend; // Queue the element
-                 // console.log(`KeyingLogic: Audio busy, queued: ${elementToSend}`); // Debug
-             } // else: Queue is full, drop the input for now (or maybe overwrite?) Current logic: drop.
-               // else { console.log(`KeyingLogic: Audio busy, queue full. Dropped: ${elementToSend}`); } // Debug
+             // --- Queue the input ---
+             // Limit queue size? For now, allow indefinite queuing.
+             this.inputQueue.push(elementToSend);
+             console.log(`[DBG] KeyingLogic: Audio busy, queued: ${elementToSend}. Queue size: ${this.inputQueue.length}`);
              return; // Don't proceed if audio busy
          }
 
@@ -323,7 +319,7 @@ export class KeyingLogic {
         // Determine the next element for Iambic mode
         if (this.gameState.isIambicHandling) {
             this.gameState.iambicState = (elementToSend === 'dit') ? 'dah' : 'dit'; // Alternate
-            // console.log(`KeyingLogic: Iambic B - Next element will be ${this.gameState.iambicState}`); // Debug
+            // console.log(`[DBG] KeyingLogic: Iambic B - Next element will be ${this.gameState.iambicState}`);
         }
         // In single key mode, iambicState remains the same (e.g., 'dit' or 'dah')
 
@@ -340,80 +336,39 @@ export class KeyingLogic {
                (!this.gameState.isIambicHandling && this.gameState.iambicState === 'dah' && checkDahActive);
 
         if (shouldScheduleNext) {
-            // console.log(`KeyingLogic: Scheduling next output check in ${delayForNextMs.toFixed(0)}ms`); // Debug
+            // console.log(`[DBG] KeyingLogic: Scheduling next output check in ${delayForNextMs.toFixed(0)}ms`);
             this.repeatOrIambicTimerId = setTimeout(() => this._triggerRepeatOrIambicOutput(), Math.max(5, delayForNextMs));
         } else {
              // If keys were released during this function's execution, re-evaluate state
-             // console.log("KeyingLogic: Keys released during processing, re-evaluating state after emit."); // Debug
+             // console.log("[DBG] KeyingLogic: Keys released during processing, re-evaluating state after emit.");
              this._processInputStateChange();
         }
     }
 
     /** Callback function triggered by TonePlayer when an input tone finishes playing naturally. */
     _handleToneEnd() {
-         // console.log("KeyingLogic: Tone end callback received."); // Debug
+         // console.log("[DBG] KeyingLogic: Tone end callback received.");
          let processedQueueItem = false;
 
          // If an item was queued because audio was busy, process it now
-         if (this.queuedInput !== null) {
-             const typeToProcess = this.queuedInput;
-             this.queuedInput = null; // Clear queue *before* processing
-             // console.log(`KeyingLogic: Processing queued input: ${typeToProcess}`); // Debug
+         if (this.inputQueue.length > 0) {
+             const typeToProcess = this.inputQueue.shift(); // Get first item from queue
+             console.log(`[DBG] KeyingLogic: Processing queued input: ${typeToProcess}. Queue size now: ${this.inputQueue.length}`);
 
-             // Check if the key for the queued item is still pressed
-             const isDitStillActive = this.ditActive;
-             const isDahStillActive = this.dahActive;
-             const shouldPlayQueued = (typeToProcess === 'dit' && isDitStillActive) ||
-                                      (typeToProcess === 'dah' && isDahStillActive);
+             // --- Play the dequeued item unconditionally ---
+             // The timing is handled by the queue processing itself.
+             this._emitInputToSequence(typeToProcess);
+             this.tonePlayer.playInputTone(typeToProcess); // Play the queued tone
+             processedQueueItem = true;
+             this.lastInputTypeGenerated = typeToProcess;
+             this.lastEmitTime = performance.now();
 
-             if (shouldPlayQueued) {
-                this._emitInputToSequence(typeToProcess);
-                this.tonePlayer.playInputTone(typeToProcess); // Play the queued tone
-                processedQueueItem = true;
-                this.lastInputTypeGenerated = typeToProcess;
-                this.lastEmitTime = performance.now();
-
-                // Ensure game state is typing if we just played something
-                 if (this.gameState.status !== GameStatus.FINISHED && this.gameState.status !== GameStatus.SHOWING_RESULTS) {
-                     this.gameState.status = GameStatus.TYPING;
-                 }
-
-             } else {
-                 // console.log(`KeyingLogic: Key for queued input '${typeToProcess}' released before playing. Discarding.`); // Debug
+             // Ensure game state is typing if we just played something
+             if (this.gameState.isPlaying() || this.gameState.status === GameStatus.READY) {
+                 this.gameState.status = GameStatus.TYPING;
              }
          }
 
-         // ---- MODIFICATION START ----
-         // Execute the state check logic immediately instead of using setTimeout
-         const checkStateAfterToneEnd = () => {
-             const isDitActive = this.ditActive;
-             const isDahActive = this.dahActive;
-
-             // If keys are still active, continue the repeat/iambic cycle
-             if (isDitActive || isDahActive) {
-                  // console.log("KeyingLogic: Tone ended, keys still active. Triggering state check."); // Debug
-                  this._processInputStateChange(); // This will schedule the next element if needed
-             }
-             // If no keys active AND nothing was just played from queue, and sequence exists, schedule decode
-             else if (!processedQueueItem && this.gameState.status === GameStatus.TYPING && this.gameState.currentInputSequence) {
-                  // console.log("KeyingLogic: Tone ended, no keys active, no queue processed. Scheduling decode."); // Debug
-                  this._scheduleDecodeAfterDelay();
-             }
-             // If no keys active and sequence is empty, revert to listening
-             else if (this.gameState.status === GameStatus.TYPING && !this.gameState.currentInputSequence) {
-                  this.gameState.status = GameStatus.LISTENING;
-             }
-             // If something *was* played from queue, even if keys are now released, schedule decode
-             else if (processedQueueItem && this.gameState.status === GameStatus.TYPING && this.gameState.currentInputSequence) {
-                 // console.log("KeyingLogic: Tone ended, queue processed. Scheduling decode."); // Debug
-                 this._scheduleDecodeAfterDelay();
-             }
-         };
-
-         checkStateAfterToneEnd();
-         // ---- MODIFICATION END ----
-
-         /* ---- OLD CODE using setTimeout ----
          // Use setTimeout to defer state check slightly, allowing release events to potentially register first
          setTimeout(() => {
              const isDitActive = this.ditActive;
@@ -421,12 +376,12 @@ export class KeyingLogic {
 
              // If keys are still active, continue the repeat/iambic cycle
              if (isDitActive || isDahActive) {
-                  // console.log("KeyingLogic: Tone ended, keys still active. Triggering state check."); // Debug
+                  // console.log("[DBG] KeyingLogic: Tone ended, keys still active. Triggering state check.");
                   this._processInputStateChange(); // This will schedule the next element if needed
              }
              // If no keys active AND nothing was just played from queue, and sequence exists, schedule decode
-             else if (!processedQueueItem && this.gameState.status === GameStatus.TYPING && this.gameState.currentInputSequence) {
-                  // console.log("KeyingLogic: Tone ended, no keys active, no queue processed. Scheduling decode."); // Debug
+             else if (!processedQueueItem && this.gameState.isPlaying() && this.gameState.currentInputSequence) {
+                  // console.log("[DBG] KeyingLogic: Tone ended, no keys active, no queue processed. Scheduling decode.");
                   this._scheduleDecodeAfterDelay();
              }
              // If no keys active and sequence is empty, revert to listening
@@ -434,12 +389,16 @@ export class KeyingLogic {
                   this.gameState.status = GameStatus.LISTENING;
              }
              // If something *was* played from queue, even if keys are now released, schedule decode
-             else if (processedQueueItem && this.gameState.status === GameStatus.TYPING && this.gameState.currentInputSequence) {
-                 // console.log("KeyingLogic: Tone ended, queue processed. Scheduling decode."); // Debug
+             else if (processedQueueItem && this.gameState.isPlaying() && this.gameState.currentInputSequence) {
+                 // console.log("[DBG] KeyingLogic: Tone ended, queue processed. Scheduling decode.");
                  this._scheduleDecodeAfterDelay();
              }
-         }, 1); // Minimal delay (Matches old code)
-         */
+             // If no keys active and nothing in queue, just ensure we are listening if game is active
+             else if (!isDitActive && !isDahActive && this.gameState.isPlaying()) {
+                 this.gameState.status = GameStatus.LISTENING;
+             }
+
+         }, 1); // Minimal delay - adjust if needed
      }
 
 
@@ -450,13 +409,14 @@ export class KeyingLogic {
          // Check if we are in a state where decoding makes sense
          const canSchedule = (
              this.gameState.currentInputSequence && // Must have a sequence to decode
-             (this.gameState.status === GameStatus.TYPING || this.gameState.status === GameStatus.LISTENING) &&
+             (this.gameState.status === GameStatus.TYPING || this.gameState.status === GameStatus.LISTENING) && // Allow scheduling from LISTENING state too
              !this.ditActive && !this.dahActive && // No keys currently pressed
-             this.tonePlayer.inputToneNode === null // Audio player is free
+             this.tonePlayer.inputToneNode === null && // Audio player is free
+             this.inputQueue.length === 0 // Queue is also empty
          );
 
          if (!canSchedule) {
-              // console.log(`KeyingLogic: Decode scheduling skipped. Status: ${this.gameState.status}, Sequence: '${this.gameState.currentInputSequence}', Keys Active: ${this.ditActive || this.dahActive}, Audio Busy: ${!!this.tonePlayer.inputToneNode}`); // Debug
+              console.log(`[DBG] KeyingLogic: Decode scheduling skipped. Status: ${this.gameState.status}, Sequence: '${this.gameState.currentInputSequence}', Keys Active: ${this.ditActive || this.dahActive}, Audio Busy: ${!!this.tonePlayer.inputToneNode}, Queue: ${this.inputQueue.length}`);
              // If we were typing but sequence is now empty, go back to listening
              if (this.gameState.status === GameStatus.TYPING && !this.gameState.currentInputSequence) {
                   this.gameState.status = GameStatus.LISTENING;
@@ -464,7 +424,7 @@ export class KeyingLogic {
              return;
          }
 
-         // console.log(`KeyingLogic: Scheduling decode for sequence: '${this.gameState.currentInputSequence}'`); // Debug
+         // console.log(`[DBG] KeyingLogic: Scheduling decode for sequence: '${this.gameState.currentInputSequence}'`);
          this.gameState.status = GameStatus.DECODING; // Set state
 
          // Ask the decoder to schedule the callback
@@ -474,11 +434,10 @@ export class KeyingLogic {
              if (this.gameState.status === GameStatus.DECODING) {
                  this.callbacks.onCharacterDecode(); // Trigger character validation in main logic
              } else {
-                  // console.log(`KeyingLogic: Decode callback executed, but status is now ${this.gameState.status}. Ignoring decode attempt.`); // Debug
+                  // console.log(`[DBG] KeyingLogic: Decode callback executed, but status is now ${this.gameState.status}. Ignoring decode attempt.`);
                  // If status changed away from DECODING, ensure state is reasonable (e.g., LISTENING)
-                 if(this.gameState.status !== GameStatus.FINISHED && this.gameState.status !== GameStatus.SHOWING_RESULTS) {
-                      // Revert to listening if not finished/showing results
-                       this.gameState.status = GameStatus.LISTENING;
+                 if (this.gameState.isPlaying()) {
+                     this.gameState.status = GameStatus.LISTENING;
                  }
              }
              // Reset iambic state after decode attempt regardless of outcome
@@ -486,8 +445,6 @@ export class KeyingLogic {
              this.gameState.iambicState = null;
          });
 
-         // Store the timeout ID in gameState for potential cancellation by other parts? (Optional)
-         // Currently decoder handles cancellation internally.
          if (timeoutId) {
              this.gameState.setCharacterTimeout(timeoutId); // Keep gameState aware of the timer
          }
@@ -498,7 +455,7 @@ export class KeyingLogic {
         if (this.repeatOrIambicTimerId) {
             clearTimeout(this.repeatOrIambicTimerId);
             this.repeatOrIambicTimerId = null;
-            // console.log("KeyingLogic: Cleared repeat/iambic timer."); // Debug
+            // console.log("[DBG] KeyingLogic: Cleared repeat/iambic timer.");
         }
     }
 }
