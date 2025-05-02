@@ -1,4 +1,4 @@
-// Dit-Dah-Dash_Refactored/src/js/game/morseDecoder.js
+/* Dit-Dah-Dash_Refactored/src/js/game/morseDecoder.js */
 
 import {
     MORSE_MAP,
@@ -24,13 +24,13 @@ export class MorseDecoder {
         this.reverseMorseMap = Object.fromEntries(
             Object.entries(this.morseMap).map(([key, value]) => [value, key])
         );
-        this.currentWpm = DEFAULT_WPM;
+        this.currentWpm = 0; // Initialize differently to ensure first update runs
         this.ditDuration = 0; // ms
         this.interCharGapThreshold = 0; // ms timeout threshold for decoding
 
         this.decodeTimeoutId = null;
 
-        this.updateWpm(this.currentWpm); // Initial calculation based on default WPM
+        this.updateWpm(DEFAULT_WPM); // Initial calculation based on default WPM
         console.log("MorseDecoder Initialized");
     }
 
@@ -40,7 +40,7 @@ export class MorseDecoder {
      */
     updateWpm(wpm) {
         // Add logging to see the received WPM value
-        // console.log("MorseDecoder.updateWpm received:", wpm); // Optional Debug log
+        console.log(`[Decoder.updateWpm] Received WPM: ${wpm} (Type: ${typeof wpm})`); // Log received value
 
         let validWpm = wpm;
         if (typeof wpm !== 'number' || isNaN(wpm) || wpm <= 0) {
@@ -49,7 +49,10 @@ export class MorseDecoder {
         }
 
         // Avoid recalculation only if the *validated* WPM matches the current one
-        if (this.currentWpm === validWpm) return;
+        if (this.currentWpm === validWpm) {
+            // console.log(`[Decoder.updateWpm] WPM unchanged (${validWpm}). Skipping recalculation.`); // Debug
+            return;
+        }
 
         this.currentWpm = validWpm;
         // Formula: 1 WPM = 50 dit units per minute (PARIS standard)
@@ -65,7 +68,8 @@ export class MorseDecoder {
         // although with validWpm > 0, this shouldn't strictly be necessary.
         this.interCharGapThreshold = Math.max(1, this.interCharGapThreshold);
 
-        console.log(`Decoder timings updated for ${this.currentWpm} WPM: Dit=${this.ditDuration.toFixed(0)}ms, Decode Timeout >= ${this.interCharGapThreshold.toFixed(0)}ms`);
+        // Add detailed log of calculated values
+        console.log(`[Decoder.updateWpm] Applied WPM=${this.currentWpm}. Calculated: Dit=${this.ditDuration.toFixed(2)}ms, Decode Timeout Threshold=${this.interCharGapThreshold.toFixed(2)}ms`);
     }
 
     /**
@@ -93,10 +97,19 @@ export class MorseDecoder {
             console.error("MorseDecoder: scheduleDecode requires a valid callback function.");
             return null;
         }
+        // --- Re-check threshold right before scheduling ---
         if (this.interCharGapThreshold <= 0) {
-             console.error("MorseDecoder: Cannot schedule decode, invalid interCharGapThreshold:", this.interCharGapThreshold);
-             return null;
+             console.error(`MorseDecoder: Cannot schedule decode, invalid interCharGapThreshold at schedule time: ${this.interCharGapThreshold}. WPM: ${this.currentWpm}`);
+             // --- Force recalculation based on current WPM as a recovery attempt ---
+             console.warn("MorseDecoder: Forcing recalculation of threshold...");
+             this.updateWpm(this.currentWpm); // This will re-validate and recalculate
+             if (this.interCharGapThreshold <= 0) {
+                 console.error("MorseDecoder: Recalculation failed to produce valid threshold. Aborting schedule.");
+                 return null; // Still invalid after recalculation
+             }
+             console.warn(`MorseDecoder: Threshold recalculated to ${this.interCharGapThreshold.toFixed(2)}ms. Proceeding with schedule.`);
         }
+
 
         // console.log(`Scheduling decode callback in ${this.interCharGapThreshold.toFixed(0)}ms`); // Debug
         this.decodeTimeoutId = setTimeout(() => {
@@ -180,11 +193,3 @@ export class MorseDecoder {
     }
 
 }
-
-// Example Usage (in another module):
-// import { MorseDecoder } from './morseDecoder.js';
-// const decoder = new MorseDecoder();
-// decoder.updateWpm(25);
-// const morseA = decoder.encodeCharacter('A'); // '.-'
-// const charFromMorse = decoder.decodeSequence('.-'); // 'A'
-// const encodedSentence = decoder.encodeSentence("HI HO"); // ".... .. / .... ---"

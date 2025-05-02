@@ -1,4 +1,4 @@
-// Dit-Dah-Dash_Refactored/src/js/input/keyingLogic.js
+/* Dit-Dah-Dash_Refactored/src/js/input/keyingLogic.js */
 
 import { GameStatus } from '../core/appStatus.js';
 import { DEFAULT_WPM, DIT_DURATION_UNITS, DAH_DURATION_UNITS, INTRA_CHARACTER_GAP_UNITS } from '../core/configConstants.js';
@@ -16,6 +16,7 @@ import { DEFAULT_WPM, DIT_DURATION_UNITS, DAH_DURATION_UNITS, INTRA_CHARACTER_GA
  * - Unconditional processing of queued item on tone end.
  * - Tone end now consistently triggers _processInputStateChange to decide the next action,
  * centralizing state evaluation after audio events.
+ * - Removed setTimeout(0) in _handleToneEnd for more direct state processing.
  */
 
 export class KeyingLogic {
@@ -47,7 +48,7 @@ export class KeyingLogic {
         this.dahActive = false;
 
         // Timing (calculated from WPM)
-        this.wpm = DEFAULT_WPM;
+        this.wpm = 0; // Initialize differently to ensure first update runs
         this.ditDurationMs = 0;
         this.dahDurationMs = 0;
         this.intraCharGapMs = 0; // Gap needed *after* an element before next can start
@@ -60,7 +61,7 @@ export class KeyingLogic {
         this.queuedInput = null;
         this.repeatOrIambicTimerId = null; // Timer for next element generation
 
-        this._calculateTimings(this.wpm); // Initial calculation
+        this._calculateTimings(DEFAULT_WPM); // Initial calculation
 
         // Set the callback for when the tone player finishes a tone
         this.tonePlayer.setOnToneEndCallback(this._handleToneEnd.bind(this));
@@ -70,24 +71,33 @@ export class KeyingLogic {
 
     /** Calculate timing values in milliseconds based on WPM. */
     _calculateTimings(wpm) {
-        if (wpm > 0) {
-             const ditMs = 1200 / wpm;
-             this.ditDurationMs = ditMs;
-             this.dahDurationMs = ditMs * DAH_DURATION_UNITS;
-             this.intraCharGapMs = ditMs * INTRA_CHARACTER_GAP_UNITS;
-             // Also update dependent modules
-             this.decoder.updateWpm(wpm);
-             this.tonePlayer.updateWpm(wpm);
-             this.wpm = wpm;
-             // console.log(`KeyingLogic timings (WPM=${wpm}): Dit=${this.ditDurationMs.toFixed(0)}ms, Dah=${this.dahDurationMs.toFixed(0)}ms, IntraGap=${this.intraCharGapMs.toFixed(0)}ms`);
+        // Validate WPM input here as well for safety
+        let validWpm = wpm;
+        if (typeof wpm !== 'number' || isNaN(wpm) || wpm <= 0) {
+            console.warn(`KeyingLogic: Invalid WPM value received: ${wpm}. Using current or default.`);
+            validWpm = this.wpm > 0 ? this.wpm : DEFAULT_WPM; // Use current valid or default
         }
+
+        // Only recalculate if WPM actually changes
+        if (this.wpm === validWpm) return;
+        this.wpm = validWpm;
+
+        const ditMs = 1200 / this.wpm;
+        this.ditDurationMs = ditMs;
+        this.dahDurationMs = ditMs * DAH_DURATION_UNITS;
+        this.intraCharGapMs = ditMs * INTRA_CHARACTER_GAP_UNITS;
+        // Also update dependent modules
+        this.decoder.updateWpm(this.wpm); // Let decoder handle its own validation
+        this.tonePlayer.updateWpm(this.wpm);
+
+        // console.log(`KeyingLogic timings updated (WPM=${this.wpm}): Dit=${this.ditDurationMs.toFixed(0)}ms, Dah=${this.dahDurationMs.toFixed(0)}ms, IntraGap=${this.intraCharGapMs.toFixed(0)}ms`);
     }
+
 
     /** Update WPM and recalculate timings. */
     updateWpm(newWpm) {
-        if (this.wpm !== newWpm && newWpm > 0) {
-            this._calculateTimings(newWpm);
-        }
+        // Pass validation to _calculateTimings
+        this._calculateTimings(newWpm);
     }
 
     /** Handles press events forwarded from InputHandler. */
@@ -426,14 +436,9 @@ export class KeyingLogic {
         }
 
         // --- Re-evaluate State After Tone Finishes (and queue was empty or just processed) ---
-        // Use setTimeout to defer the state check slightly, ensuring the call stack clears
-        // and allows any synchronous release events to be processed first.
-        // console.log("[DBG] KeyingLogic: Tone ended (no queue processed or queue item just started), scheduling state check.");
-        setTimeout(() => {
-            // Let _processInputStateChange decide the next action based on the current key state
-            // and other conditions (like whether decoding should now occur).
-            this._processInputStateChange();
-        }, 0); // Using 0ms delay allows yielding to the event loop quickly.
+        // Remove the setTimeout(..., 0) to call state check directly
+        // console.log("[DBG] KeyingLogic: Tone ended (no queue processed), calling _processInputStateChange directly.");
+        this._processInputStateChange();
     }
 
 
@@ -442,6 +447,17 @@ export class KeyingLogic {
          // console.log(`[DBG] KeyingLogic: Attempting to schedule decode for sequence: '${this.gameState.currentInputSequence}'`);
          this.decoder.cancelScheduledDecode(); // Clear any previous decode timer (safe to call if null)
          if (this.gameState.characterTimeoutId) this.gameState.clearCharacterTimeout(); // Clear game state ref too
+
+         // --- Add explicit check for decoder's threshold validity ---
+         if (!this.decoder || typeof this.decoder.interCharGapThreshold !== 'number' || this.decoder.interCharGapThreshold <= 0) {
+             console.error(`[KeyingLogic._scheduleDecodeAfterDelay] Error: Invalid morseDecoder.interCharGapThreshold (${this.decoder?.interCharGapThreshold}). Aborting decode schedule.`);
+             // Attempt to reset state to avoid getting stuck
+              if (this.gameState.status === GameStatus.TYPING || this.gameState.status === GameStatus.DECODING) {
+                   this.gameState.status = GameStatus.LISTENING;
+              }
+             return;
+         }
+         // --- End explicit check ---
 
          // Check if we are in a state where decoding makes sense *now*
          // These checks are crucial to prevent scheduling when not appropriate.
