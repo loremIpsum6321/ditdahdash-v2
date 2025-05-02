@@ -1,10 +1,7 @@
 deployment:
   tasks:
     - export DEPLOYPATH=/home/markzpwz/public_html/Dit-Dah-Dash/
-    # Removed the incorrect 'cd' command below
-    # Copy contents FROM the nested Dit-Dah-Dash directory
+    # This is the line to check:
     - /bin/rsync -av --delete --exclude '.git' --exclude '.cpanel.yml' ./Dit-Dah-Dash/ "${DEPLOYPATH}"
-    # find command targets the DEPLOYPATH, which is correct
     - find "${DEPLOYPATH}" -type d -exec chmod 755 {} \;
-    # Optional: Uncomment below if you also need to set file permissions
-    # - find "${DEPLOYPATH}" -type f -exec chmod 644 {} \;
+    # - find "${DEPLOYPATH}" -type f -exec chmod 644 {} \; # Optional: Uncomment if needed
