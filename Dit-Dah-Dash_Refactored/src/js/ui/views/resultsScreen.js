@@ -29,6 +29,7 @@ export class ResultsScreen {
             !this.resultsInstructions || !this.menuButton) {
             console.error("ResultsScreen: Could not find all required results screen elements. Check IDs.");
         }
+         console.log("[DEBUG ResultsScreen] Constructor finished."); // Added log
     }
 
     /**
@@ -40,13 +41,17 @@ export class ResultsScreen {
      * @param {object} keyMappings - Current key mappings { dit: 'key', dah: 'key' } for hint display.
      */
     show(scores, unlockedLevelId, hasNextLevelOption, mode, keyMappings) {
-        // console.log("ResultsScreen: Showing"); // Debug
+        console.log("[DEBUG ResultsScreen show] Called."); // Added log
+        console.log("[DEBUG ResultsScreen show] Received Scores:", JSON.parse(JSON.stringify(scores))); // Added log
+        console.log(`[DEBUG ResultsScreen show] unlockedLevelId: ${unlockedLevelId}, hasNextLevelOption: ${hasNextLevelOption}, mode: ${mode}`); // Added log
+
         if (!this.resultsScreen || !scores) {
-            console.error("ResultsScreen: Cannot show - screen element or scores missing.");
+            console.error("[DEBUG ResultsScreen show] Cannot show - screen element or scores missing.");
             return;
         }
 
         // Populate score details
+        console.log("[DEBUG ResultsScreen show] Populating score details..."); // Added log
         setTextContent(this.resultsTime, `Time: ${scores.elapsedTimeSeconds?.toFixed(1) ?? 'N/A'}s`);
         setTextContent(this.resultsNetWpm, `Net WPM: ${scores.netWpm?.toFixed(1) ?? 'N/A'}`);
         setTextContent(this.resultsGrossWpm, `Gross WPM: ${scores.grossWpm?.toFixed(1) ?? 'N/A'}`);
@@ -57,9 +62,12 @@ export class ResultsScreen {
 
         // Display unlock message if applicable (only in Game mode)
         if (mode === AppMode.GAME && unlockedLevelId) {
-            setTextContent(this.levelUnlockMessage, `Congratulations! Level ${unlockedLevelId} unlocked!`);
+            const unlockMsg = `Congratulations! Level ${unlockedLevelId} unlocked!`;
+            console.log(`[DEBUG ResultsScreen show] Setting unlock message: "${unlockMsg}"`); // Added log
+            setTextContent(this.levelUnlockMessage, unlockMsg);
             showElement(this.levelUnlockMessage);
         } else {
+             console.log("[DEBUG ResultsScreen show] Clearing unlock message."); // Added log
              // Clear message and ensure it takes up no space if hidden
              setTextContent(this.levelUnlockMessage, '');
              // Use style.display none might be better if CSS uses margins/padding
@@ -71,15 +79,20 @@ export class ResultsScreen {
         if (this.resultsInstructions && keyMappings?.dit && keyMappings?.dah) {
             const keyDisplayDit = getKeyDisplay(keyMappings.dit);
             const keyDisplayDah = getKeyDisplay(keyMappings.dah);
+            const instructionsHTML = `Press <span class="key-hint">${keyDisplayDit}</span> (Retry) or <span class="key-hint">${keyDisplayDah}</span> (Next)`;
+            console.log(`[DEBUG ResultsScreen show] Setting instructions HTML: ${instructionsHTML}`); // Added log
             // Use innerHTML carefully here as we are adding spans
-            this.resultsInstructions.innerHTML = `Press <span class="key-hint">${keyDisplayDit}</span> (Retry) or <span class="key-hint">${keyDisplayDah}</span> (Next)`;
+            this.resultsInstructions.innerHTML = instructionsHTML;
         } else if (this.resultsInstructions) {
+             const fallbackText = "Press Dit (Retry) or Dah (Next)";
+            console.warn("[DEBUG ResultsScreen show] Key mappings missing, using fallback instructions."); // Added log
             // Fallback text if key mappings are missing
-            setTextContent(this.resultsInstructions, "Press Dit (Retry) or Dah (Next)");
+            setTextContent(this.resultsInstructions, fallbackText);
         }
 
         // Show the screen itself
         showElement(this.resultsScreen);
+        console.log("[DEBUG ResultsScreen show] Screen element shown."); // Added log
 
         // Note: Updating paddle labels/state is handled by PaddleControls module
     }
@@ -88,7 +101,7 @@ export class ResultsScreen {
      * Hides the results screen.
      */
     hide() {
-        // console.log("ResultsScreen: Hiding"); // Debug
+        console.log("[DEBUG ResultsScreen hide] Called."); // Added log
         if (this.resultsScreen) {
             hideElement(this.resultsScreen);
         }
@@ -106,6 +119,8 @@ export class ResultsScreen {
         if (accuracy >= 98) filledStars = 3;
         else if (accuracy >= 90) filledStars = 2;
         else if (accuracy >= 75) filledStars = 1;
+
+        // console.log(`[DEBUG ResultsScreen updateStarRating] Accuracy: ${accuracy}, Filled Stars: ${filledStars}`); // Added log - potentially noisy
 
         stars.forEach((star, index) => {
             if (star instanceof HTMLElement) {
@@ -129,7 +144,10 @@ export class ResultsScreen {
         }
 
         if (this.menuButton && typeof callbacks.onShowMainMenu === 'function') {
-            this.menuButton.addEventListener('click', callbacks.onShowMainMenu);
+            this.menuButton.addEventListener('click', () => {
+                 console.log("[DEBUG ResultsScreen menuButton Click] Calling onShowMainMenu callback."); // Added log
+                 callbacks.onShowMainMenu();
+            });
         }
 
         console.log("ResultsScreen: Event listeners added.");

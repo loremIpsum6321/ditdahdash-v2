@@ -16,12 +16,14 @@ export class GameState {
      */
     constructor() {
         this.reset(); // Initial state setup
+        console.log('[DEBUG gameState constructor] Initial reset complete.');
     }
 
     /**
      * Resets the application state, typically called on startup or returning to menu.
      */
      reset() {
+        console.log('[DEBUG gameState reset] Called. Resetting state...');
         this.status = GameStatus.IDLE; // Start as idle, main.js will set to MENU
         this.currentMode = AppMode.MENU; // Track the mode
 
@@ -52,6 +54,7 @@ export class GameState {
         this.wordsCompletedInChunk = 0;  // Words completed since last word generation
 
         console.log("Application state reset.");
+        console.log('[DEBUG gameState reset] State after reset:', JSON.parse(JSON.stringify(this))); // Deep copy for logging complex state
     }
 
 
@@ -63,6 +66,7 @@ export class GameState {
      * @param {string} sentenceText - The text of the sentence.
      */
     startLevelSentence(levelId, sentenceIndex, sentenceText) {
+        console.log(`[DEBUG gameState startLevelSentence] Called. Level: ${levelId}, SentenceIndex: <span class="math-inline">\{sentenceIndex\}, Text\: "</span>{sentenceText}"`);
         // Reset only game-specific counters/tracking
         this.currentMode = AppMode.GAME;
         this.currentLevelId = levelId;
@@ -78,6 +82,7 @@ export class GameState {
         this.wordsCompletedCount = 0; this.currentWordChunk = []; this.wordsCompletedInChunk = 0; // Reset loremipsum state
 
         this._skipLeadingSpaces();
+        console.log('[DEBUG gameState startLevelSentence] State BEFORE setting READY:', JSON.parse(JSON.stringify(this)));
         this.status = GameStatus.READY; // Set state after setup
         console.log(`Starting Level ${levelId}, Sentence ${sentenceIndex + 1}. Mode: ${this.currentMode}, Status: ${this.status}`);
     }
@@ -87,6 +92,7 @@ export class GameState {
      * @param {string} sentenceText - The custom sentence text.
      */
     startSandboxSentence(sentenceText) {
+        console.log(`[DEBUG gameState startSandboxSentence] Called. Text: "${sentenceText}"`);
         // Reset only game-specific counters/tracking
         this.currentMode = AppMode.SANDBOX;
         this.currentLevelId = null; // No level ID in sandbox
@@ -102,6 +108,7 @@ export class GameState {
         this.wordsCompletedCount = 0; this.currentWordChunk = []; this.wordsCompletedInChunk = 0; // Reset loremipsum state
 
         this._skipLeadingSpaces();
+        console.log('[DEBUG gameState startSandboxSentence] State BEFORE setting READY:', JSON.parse(JSON.stringify(this)));
         this.status = GameStatus.READY; // Set state after setup
         console.log(`Starting Sandbox. Mode: ${this.currentMode}, Status: ${this.status}`);
     }
@@ -111,6 +118,7 @@ export class GameState {
      * @param {Array<string>} initialWords - The first batch of words.
      */
     startLoremIpsumMode(initialWords) {
+        console.log(`[DEBUG gameState startLoremIpsumMode] Called. Initial words count: ${initialWords.length}`);
         this.currentMode = AppMode.LOREM_IPSUM;
         this.currentLevelId = null;
         this.currentSentenceIndex = 0;
@@ -129,6 +137,7 @@ export class GameState {
         this.wordsCompletedInChunk = 0;
 
         this._skipLeadingSpaces();
+        console.log('[DEBUG gameState startLoremIpsumMode] State BEFORE setting READY:', JSON.parse(JSON.stringify(this)));
         this.status = GameStatus.READY;
         console.log(`Starting LoremIpsum Mode. Mode: ${this.currentMode}, Status: ${this.status}`);
     }
@@ -142,8 +151,10 @@ export class GameState {
 
      /** Starts the game/sandbox/loremipsum timer if status is READY. */
      startTimer() {
+        console.log(`[DEBUG gameState startTimer] Called. Current status: ${this.status}`);
         if (this.status === GameStatus.READY) {
             this.startTime = performance.now();
+            console.log(`[DEBUG gameState startTimer] Timer started. startTime: ${this.startTime}, New status: ${GameStatus.LISTENING}`);
             this.status = GameStatus.LISTENING;
             this.lastInputTime = this.startTime;
             console.log("Timer started.");
@@ -154,6 +165,7 @@ export class GameState {
 
     /** Stops the game/sandbox/loremipsum timer and sets status to FINISHED. */
     stopTimer() {
+        console.log(`[DEBUG gameState stopTimer] Called. Current status: ${this.status}, Mode: ${this.currentMode}`);
         // In LoremIpsum mode, the timer doesn't stop normally, only on exit.
         if (this.currentMode === AppMode.LOREM_IPSUM) {
             console.log("Timer stop requested in LoremIpsum Mode - typically only happens on exit.");
@@ -166,6 +178,7 @@ export class GameState {
         if (this.startTime > 0 && this.status !== GameStatus.FINISHED && this.status !== GameStatus.SHOWING_RESULTS) {
             this.endTime = performance.now();
             this.elapsedTime = this.endTime - this.startTime;
+            console.log(`[DEBUG gameState stopTimer] Timer stopped. endTime: ${this.endTime}, Calculated elapsedTime: ${this.elapsedTime}, New status: ${GameStatus.FINISHED}`);
             this.status = GameStatus.FINISHED;
             console.log(`Timer stopped. Elapsed: ${this.elapsedTime.toFixed(0)}ms`);
             return true;
@@ -178,6 +191,7 @@ export class GameState {
 
     /** Updates the game/sandbox/loremipsum input sequence. */
     addInput(input) {
+        console.log(`[DEBUG gameState addInput] Input: '<span class="math-inline">\{input\}', Current sequence\: '</span>{this.currentInputSequence}', Status: ${this.status}`);
         const now = performance.now();
         // Only count inputs if actually in a playing state
         if (this.isPlaying() || this.status === GameStatus.READY) { // Adjusted check for READY
@@ -203,6 +217,7 @@ export class GameState {
 
     /** Clears the current game/sandbox/loremipsum input sequence. */
     clearCurrentInput() {
+        console.log(`[DEBUG gameState clearCurrentInput] Clearing sequence: '${this.currentInputSequence}'. Current status: ${this.status}, isPlaying: ${this.isPlaying()}`);
         // console.log(`Clearing input sequence. Was: '${this.currentInputSequence}'`); // Debug
         this.currentInputSequence = "";
         this.inputTimestamps = [];
@@ -210,7 +225,7 @@ export class GameState {
 
         // Reset to listening state only if actively playing
         if (this.isPlaying()) {
-            // console.log("Setting status to LISTENING after clearing input."); // Debug
+            console.log(`[DEBUG gameState clearCurrentInput] Setting status to LISTENING.`);
             this.status = GameStatus.LISTENING;
         }
     }
@@ -235,6 +250,7 @@ export class GameState {
      * Returns true if more chars exist, false if sentence complete (Game/Sandbox only).
      */
     moveToNextCharacter() {
+        console.log(`[DEBUG gameState moveToNextCharacter] Called. Current index: ${this.currentCharIndex}, Current sentence length: ${this.currentSentence.length}`);
         const previousCharIndex = this.currentCharIndex;
         const previousChar = this.currentSentence[previousCharIndex];
 
@@ -255,18 +271,20 @@ export class GameState {
         while (this.currentCharIndex < this.currentSentence.length && this.currentSentence[this.currentCharIndex] === ' ') {
             this.currentCharIndex++;
         }
-
+        console.log(`[DEBUG gameState moveToNextCharacter] Incrementing correctChars. New index: <span class="math-inline">\{this\.currentCharIndex\}\. Previous char was\: '</span>{previousChar}'`);
         this.clearCurrentInput(); // Clears sequence, potentially sets state to LISTENING
 
         // Check if end of sentence reached
         if (this.currentCharIndex >= this.currentSentence.length) {
             // In LoremIpsum mode, this means we need more words (handled by GameController)
             // In Game/Sandbox, this signals the end.
+            console.log(`[DEBUG gameState moveToNextCharacter] End of sentence reached. Mode: ${this.currentMode}`);
             if (this.currentMode === AppMode.GAME || this.currentMode === AppMode.SANDBOX) {
                 this.stopTimer(); // Sets status to FINISHED
                 console.log("Sentence finished!");
                 return false; // No more characters (for Game/Sandbox)
             } else {
+                console.log(`[DEBUG gameState moveToNextCharacter] More characters remain. New index: ${this.currentCharIndex}`);
                  // In LoremIpsum mode, reaching the end doesn't stop the timer or mark as finished.
                  // The GameController will handle adding more words.
                  // We still return true because the *mode* continues.
@@ -282,11 +300,13 @@ export class GameState {
 
     /** Appends new words to the sentence in LoremIpsum Mode. */
     appendLoremIpsumWords(newWords) {
+        console.log(`[DEBUG gameState appendLoremIpsumWords] Called. Current sentence length: ${this.currentSentence.length}, New words count: ${newWords?.length}`);
         if (this.currentMode !== AppMode.LOREM_IPSUM || !newWords || newWords.length === 0) {
             return false;
         }
         const newSentencePart = " " + newWords.join(' '); // Add space separator
         this.currentSentence += newSentencePart;
+        console.log(`[DEBUG gameState appendLoremIpsumWords] Sentence updated. New totalChars: ${this.totalCharsInSentence}`);
         this.totalCharsInSentence += newSentencePart.split('').filter(char => char !== ' ').length; // Update total chars
         this.currentWordChunk.push(...newWords); // Add to the internal chunk list (optional)
         console.log(`LoremIpsum: Appended ${newWords.length} words.`);
@@ -296,8 +316,9 @@ export class GameState {
 
     /** Records an incorrect game/sandbox/loremipsum attempt. */
     registerIncorrectAttempt() {
+        console.log(`[DEBUG gameState registerIncorrectAttempt] Incrementing incorrectAttempts. Before: ${this.incorrectAttempts}`);
         this.incorrectAttempts++;
-        console.log("Incorrect attempt registered. Total:", this.incorrectAttempts);
+        console.log(`[DEBUG gameState registerIncorrectAttempt] Incorrect attempt registered. Total now: ${this.incorrectAttempts}`);
     }
 
     /** Checks if the game is in an active playing state (input matters for game/sandbox/loremipsum). */
@@ -313,42 +334,55 @@ export class GameState {
      isAudioPlayingBack() {
          return this.currentMode === AppMode.PLAYBACK && this.status === GameStatus.PLAYING_BACK;
      }
-
-    /** Gets the target game/sandbox/loremipsum character (uppercase or space). */
-    getTargetCharacter() {
-        if (this.isPlaying() && this.currentCharIndex < this.currentSentence.length) {
-             const char = this.currentSentence[this.currentCharIndex];
-             return char === ' ' ? ' ' : char.toUpperCase();
-        } return null;
+/** Gets the target game/sandbox/loremipsum character (uppercase or space). */
+getTargetCharacter() {
+    if (this.isPlaying() && this.currentCharIndex < this.currentSentence.length) {
+         const char = this.currentSentence[this.currentCharIndex];
+         return char === ' ' ? ' ' : char.toUpperCase();
     }
+    return null;
+}
 
-     /** Gets the target game/sandbox/loremipsum character (raw case). */
-     getTargetCharacterRaw() {
-          if (this.isPlaying() && this.currentCharIndex < this.currentSentence.length) {
-             return this.currentSentence[this.currentCharIndex];
-         } return null;
+ /** Gets the target game/sandbox/loremipsum character (raw case). */
+ getTargetCharacterRaw() {
+      if (this.isPlaying() && this.currentCharIndex < this.currentSentence.length) {
+         return this.currentSentence[this.currentCharIndex];
      }
+     return null;
+ }
 
-    /** Gets the current calculated elapsed game/sandbox/loremipsum time. */
-    getCurrentElapsedTime() {
-        if (this.startTime === 0) return 0;
-        // In LoremIpsum mode, only stopTimer called on exit, so always calculate current time
-        if (this.currentMode === AppMode.LOREM_IPSUM) {
-             return performance.now() - this.startTime;
-        }
-        // Handle Game/Sandbox finish states
-        if (this.status === GameStatus.FINISHED || this.status === GameStatus.SHOWING_RESULTS) {
-            if (this.endTime === 0 && this.status === GameStatus.FINISHED) {
-                 this.endTime = performance.now();
-                 this.elapsedTime = this.endTime - this.startTime;
-            }
-            return this.elapsedTime;
-        }
-        // Calculate current time if playing
-        if (this.isPlaying()) {
-            return this.startTime > 0 ? (performance.now() - this.startTime) : 0;
-        }
+/** Gets the current calculated elapsed game/sandbox/loremipsum time. */
+getCurrentElapsedTime() {
+    console.log(`[DEBUG gameState getCurrentElapsedTime] Called. startTime: ${this.startTime}, endTime: ${this.endTime}, Status: ${this.status}, Mode: ${this.currentMode}`); // Added log
 
-        return 0; // Return 0 if not actively timing
+    if (this.startTime === 0) {
+         console.log(`[DEBUG gameState getCurrentElapsedTime] Returning: 0 (startTime is 0)`); // Added log
+         return 0;
     }
+    // In LoremIpsum mode, only stopTimer called on exit, so always calculate current time
+    if (this.currentMode === AppMode.LOREM_IPSUM) {
+        const calculatedTime = performance.now() - this.startTime;
+        console.log(`[DEBUG gameState getCurrentElapsedTime] Returning: ${calculatedTime} (LoremIpsum mode - current time)`); // Added log
+         return calculatedTime;
+    }
+    // Handle Game/Sandbox finish states
+    if (this.status === GameStatus.FINISHED || this.status === GameStatus.SHOWING_RESULTS) {
+        if (this.endTime === 0 && this.status === GameStatus.FINISHED) {
+             this.endTime = performance.now();
+             this.elapsedTime = this.endTime - this.startTime;
+             console.log(`[DEBUG gameState getCurrentElapsedTime] Calculated final elapsedTime: ${this.elapsedTime}`); // Added log
+        }
+        console.log(`[DEBUG gameState getCurrentElapsedTime] Returning: ${this.elapsedTime} (Finished/Showing Results)`); // Added log
+        return this.elapsedTime;
+    }
+    // Calculate current time if playing
+    if (this.isPlaying()) {
+        const calculatedTime = this.startTime > 0 ? (performance.now() - this.startTime) : 0;
+         console.log(`[DEBUG gameState getCurrentElapsedTime] Returning: ${calculatedTime} (isPlaying - current time)`); // Added log
+        return calculatedTime;
+    }
+
+    console.log(`[DEBUG gameState getCurrentElapsedTime] Returning: 0 (default case - not actively timing)`); // Added log
+    return 0; // Return 0 if not actively timing
+}
 }

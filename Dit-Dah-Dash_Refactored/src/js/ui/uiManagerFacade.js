@@ -50,6 +50,7 @@ export class UIManagerFacade {
      * @private
      */
     _hideAllViews() {
+        console.log('[DEBUG UIManagerFacade _hideAllViews] Hiding all views.'); // Added log
         this.mainMenu.hide();
         this.gameScreen.hide();
         this.playbackScreen.hide();
@@ -65,6 +66,7 @@ export class UIManagerFacade {
      * @private
      */
     _setInputAreaVisibility(showPaddles) {
+        console.log(`[DEBUG UIManagerFacade _setInputAreaVisibility] Setting paddles visible: ${showPaddles}`); // Added log
         if (this.inputArea) {
             if (showPaddles) {
                 showElement(this.inputArea);
@@ -79,38 +81,42 @@ export class UIManagerFacade {
     // --- View Switching Methods ---
 
     showMainMenu() {
+        console.log("[DEBUG UIManagerFacade showMainMenu] Called."); // Added log
         this._hideAllViews();
         this.mainMenu.show();
         this._setInputAreaVisibility(false); // No paddles on main menu
         this.activeView = this.mainMenu;
-        console.log("UI Facade: Showing Main Menu");
+        console.log("UI Facade: Showing Main Menu"); // Keep original log
     }
 
     /** Shows the main game screen UI, used for Game, Sandbox, and LoremIpsum modes. */
     showGameScreen() {
+        console.log("[DEBUG UIManagerFacade showGameScreen] Called."); // Added log
         this._hideAllViews();
         this.gameScreen.show();
         this.paddleControls.updatePaddleLabels('game'); // Set paddle labels for game mode
         this._setInputAreaVisibility(true); // Show paddles for game
         this.activeView = this.gameScreen;
         // Log specific mode later when setting up listeners/state
-        console.log("UI Facade: Showing Game Screen (for Game/Sandbox/LoremIpsum)");
+        console.log("UI Facade: Showing Game Screen (for Game/Sandbox/LoremIpsum)"); // Keep original log
     }
 
     showPlaybackScreen() {
+        console.log("[DEBUG UIManagerFacade showPlaybackScreen] Called."); // Added log
         this._hideAllViews();
         this.playbackScreen.show();
         this._setInputAreaVisibility(false); // No paddles for playback setup
         this.activeView = this.playbackScreen;
-        console.log("UI Facade: Showing Playback Screen");
+        console.log("UI Facade: Showing Playback Screen"); // Keep original log
     }
 
     showSandboxScreen() {
+        console.log("[DEBUG UIManagerFacade showSandboxScreen] Called."); // Added log
         this._hideAllViews();
         this.sandboxScreen.show();
         this._setInputAreaVisibility(false); // No paddles for sandbox setup
         this.activeView = this.sandboxScreen;
-        console.log("UI Facade: Showing Sandbox Screen");
+        console.log("UI Facade: Showing Sandbox Screen"); // Keep original log
     }
 
     /**
@@ -118,12 +124,13 @@ export class UIManagerFacade {
      * @param {Array<object>} levelsWithStatus - Data from LevelManager.
      */
     showLevelSelectScreen(levelsWithStatus) {
+        console.log("[DEBUG UIManagerFacade showLevelSelectScreen] Called."); // Added log
         this._hideAllViews();
         this.levelSelectScreen.populateLevelList(levelsWithStatus);
         this.levelSelectScreen.show();
         this._setInputAreaVisibility(false); // No paddles for level select
         this.activeView = this.levelSelectScreen;
-        console.log("UI Facade: Showing Level Select Screen");
+        console.log("UI Facade: Showing Level Select Screen"); // Keep original log
     }
 
     /**
@@ -136,9 +143,13 @@ export class UIManagerFacade {
      * @param {object} keyMappings - Current key mappings for hints.
      */
     showResultsScreen(scores, unlockedLevelId, hasNextLevelOption, mode, keyMappings) {
+        console.log("[DEBUG UIManagerFacade showResultsScreen] Called."); // Added log
+        console.log("[DEBUG UIManagerFacade showResultsScreen] Scores:", JSON.parse(JSON.stringify(scores))); // Added log
+        console.log(`[DEBUG UIManagerFacade showResultsScreen] unlockedLevelId: ${unlockedLevelId}, hasNextLevelOption: ${hasNextLevelOption}, mode: ${mode}`); // Added log
+
         // Do not show results for LoremIpsum mode
         if (mode === AppMode.LOREM_IPSUM) {
-             console.log("UI Facade: Skipping results screen for LoremIpsum mode.");
+             console.log("[DEBUG UIManagerFacade showResultsScreen] Skipping results screen for LoremIpsum mode.");
              // Potentially navigate somewhere else, like main menu? Or just stay?
              // For now, we assume the GameController handles the flow for LoremIpsum.
              return;
@@ -149,7 +160,7 @@ export class UIManagerFacade {
         this.paddleControls.updatePaddleLabels('results', hasNextLevelOption, mode); // Set paddle labels for results
         this._setInputAreaVisibility(true); // Show paddles for results input
         this.activeView = this.resultsScreen;
-        console.log("UI Facade: Showing Results Screen");
+        console.log("UI Facade: Showing Results Screen"); // Keep original log
     }
 
     // --- Global UI Management ---
@@ -159,8 +170,9 @@ export class UIManagerFacade {
      * @param {boolean} enable - True to enable dark mode, false for light mode.
      */
     applyDarkMode(enable) {
+        console.log(`[DEBUG UIManagerFacade applyDarkMode] Setting dark mode: ${enable}`); // Added log
         this.bodyElement.classList.toggle('dark-mode', enable);
-        console.log(`UI Facade: Dark Mode ${enable ? 'Enabled' : 'Disabled'}`);
+        console.log(`UI Facade: Dark Mode ${enable ? 'Enabled' : 'Disabled'}`); // Keep original log
     }
 
     // --- Accessors for View Modules (Optional) ---
@@ -193,6 +205,8 @@ export class UIManagerFacade {
              console.error("UIManagerFacade: Missing callbacks object for addEventListeners.");
              return;
          }
+
+         console.log("[DEBUG UIManagerFacade addEventListeners] Delegating listeners to views..."); // Added log
 
          // Call addEventListeners on each view module, passing relevant callbacks
          this.mainMenu.addEventListeners({
@@ -233,7 +247,7 @@ export class UIManagerFacade {
          // Note: PaddleControls doesn't need listeners setup here, it handles its own drag/drop internally.
          // Note: SettingsModal listeners setup separately when modal instance is created.
 
-        console.log("UIManagerFacade: Event listeners delegated to views.");
+        console.log("UIManagerFacade: Event listeners delegated to views."); // Keep original log
      }
 
 }

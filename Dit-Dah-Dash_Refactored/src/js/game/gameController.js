@@ -56,7 +56,7 @@ export class GameController {
 
     /** Starts a specific level and sentence index. */
     startGameLevel(levelId, sentenceIndex = 0) {
-        console.log(`GameController: Attempting to start Level ${levelId}, Sentence ${sentenceIndex + 1}`);
+        console.log(`[DEBUG GameController startGameLevel] Called. Level: ${levelId}, SentenceIndex: ${sentenceIndex + 1}`); // Added log
         const sentenceText = this.levelManager.getSpecificSentence(levelId, sentenceIndex);
 
         if (sentenceText === null) {
@@ -67,25 +67,27 @@ export class GameController {
 
         // Prepare game state
         this.gameState.startLevelSentence(levelId, sentenceIndex, sentenceText);
+        console.log(`[DEBUG GameController startGameLevel] gameState after startLevelSentence:`, JSON.parse(JSON.stringify(this.gameState))); // Added log
         this._commonStartGameUI(sentenceText); // Use common UI setup
     }
 
     /** Starts the sandbox mode with a given sentence. */
     startSandboxPractice(sentenceText) {
+        console.log(`[DEBUG GameController startSandboxPractice] Called. Text: "${sentenceText}"`); // Added log
         if (!sentenceText || !sentenceText.trim()) {
             alert("Please enter a sentence for Sandbox mode.");
             return; // Or navigate back?
         }
-        console.log(`GameController: Attempting to start Sandbox with: "${sentenceText}"`);
 
         // Prepare game state
         this.gameState.startSandboxSentence(sentenceText);
+        console.log(`[DEBUG GameController startSandboxPractice] gameState after startSandboxSentence:`, JSON.parse(JSON.stringify(this.gameState))); // Added log
         this._commonStartGameUI(sentenceText); // Use common UI setup
     }
 
     /** Starts the LoremIpsum mode. (Renamed from startEndlessMode) */
     startLoremIpsumMode() {
-        console.log(`GameController: Attempting to start LoremIpsum Mode`);
+        console.log(`[DEBUG GameController startLoremIpsumMode] Called.`); // Added log
         this.loremIpsumGenerator.reset(); // Ensure generator starts from beginning
         const initialWords = this.loremIpsumGenerator.generateWords(this.loremIpsumInitialWordCount);
         if (!initialWords || initialWords.length === 0) {
@@ -97,6 +99,7 @@ export class GameController {
 
         // Prepare game state
         this.gameState.startLoremIpsumMode(initialWords); // Renamed method in GameState
+        console.log(`[DEBUG GameController startLoremIpsumMode] gameState after startLoremIpsumMode:`, JSON.parse(JSON.stringify(this.gameState))); // Added log
         this._commonStartGameUI(this.gameState.currentSentence); // Use common UI setup with initial sentence
     }
 
@@ -106,6 +109,7 @@ export class GameController {
      * @private
      */
     _commonStartGameUI(sentenceText) {
+        console.log(`[DEBUG GameController _commonStartGameUI] Called. Sentence: "${sentenceText}"`); // Added log
         this.uiFacade.showGameScreen();
         const gameScreen = this.uiFacade.getGameScreen();
         if (gameScreen) {
@@ -139,6 +143,7 @@ export class GameController {
              console.error("GameController: Could not get GameScreen instance from UI Facade.");
         }
 
+        console.log(`[DEBUG GameController _commonStartGameUI] Resetting stats/patterns and stopping UI timer.`); // Added log
         this.callbacks.onUpdateUIStatsTimer(false); // Stop any previous timer
         console.log(`GameController: ${this.gameState.currentMode} ready.`);
     }
@@ -149,6 +154,9 @@ export class GameController {
      * Called by KeyingLogic after decode timeout.
      */
      handleCharacterDecode() {
+        const sequence = this.gameState.currentInputSequence; // Get sequence *before* clearing
+        console.log(`[DEBUG GameController handleCharacterDecode] Called. Status: ${this.gameState.status}, Sequence: '${sequence}'`); // Added log
+
          // Ensure we are in a state where decoding makes sense
          if (this.gameState.status !== GameStatus.DECODING || !(this.gameState.isPlaying())) { // isPlaying covers GAME/SANDBOX/LOREM_IPSUM
             console.warn("GameController: handleCharacterDecode called in unexpected state/mode:", this.gameState.status, this.gameState.currentMode);
@@ -156,7 +164,6 @@ export class GameController {
             return;
          }
 
-         const sequence = this.gameState.currentInputSequence;
          const targetChar = this.gameState.getTargetCharacter(); // Uppercase target
 
          // Clear the input sequence in game state (UI update handled separately)
@@ -184,7 +191,7 @@ export class GameController {
         // --- Compare Decoded Character with Target ---
         if (decodedChar && targetChar && decodedChar === targetChar) {
             // --- CORRECT ---
-            // console.log(`GameController: Correct! Decoded: ${decodedChar}, Target: ${targetChar}`); // Less verbose log
+            console.log(`[DEBUG GameController handleCharacterDecode] CORRECT. Decoded: ${decodedChar}, Target: ${targetChar}`); // Added log
             if(gameScreen) {
                 gameScreen.updateCharacterState(currentIndex, 'completed');
                 gameScreen.setPatternDisplayState('correct'); // Green flash pattern
@@ -219,7 +226,7 @@ export class GameController {
             }
         } else {
             // --- INCORRECT ---
-            console.log(`GameController: Incorrect. Decoded: ${decodedChar ?? 'null'}, Target: ${targetChar}`);
+            console.log(`[DEBUG GameController handleCharacterDecode] INCORRECT. Decoded: ${decodedChar ?? 'null'}, Target: ${targetChar}`); // Added log
             this.gameState.registerIncorrectAttempt();
             this.tonePlayer.playIncorrectSound(); // Play incorrect beep
 
@@ -245,15 +252,17 @@ export class GameController {
      * @private
      */
     _checkAndAppendLoremIpsumWords() { // Renamed function
+        console.log(`[DEBUG GameController _checkAndAppendLoremIpsumWords] Called. Mode: ${this.gameState.currentMode}, WordsCompletedInChunk: ${this.gameState.wordsCompletedInChunk}, TriggerCount: ${this.loremIpsumChunkTriggerCount}`); // Added log
         if (this.gameState.currentMode !== AppMode.LOREM_IPSUM) return;
 
         if (this.gameState.wordsCompletedInChunk >= this.loremIpsumChunkTriggerCount) {
-            console.log(`LoremIpsum: Completed ${this.gameState.wordsCompletedInChunk} words, generating ${this.loremIpsumWordsPerChunk} more.`);
+            console.log(`[DEBUG GameController _checkAndAppendLoremIpsumWords] Trigger count met. Generating ${this.loremIpsumWordsPerChunk} new words.`); // Added log
             const newWords = this.loremIpsumGenerator.generateWords(this.loremIpsumWordsPerChunk);
             if (newWords && newWords.length > 0) {
                 const success = this.gameState.appendLoremIpsumWords(newWords); // Renamed GameState method
                 if (success) {
                     this.gameState.wordsCompletedInChunk = 0; // Reset chunk counter
+                    console.log(`[DEBUG GameController _checkAndAppendLoremIpsumWords] Successfully appended words. Reset chunk count to 0.`); // Added log
                     // Update the UI to show the appended sentence
                     const gameScreen = this.uiFacade.getGameScreen();
                     if (gameScreen) {
@@ -282,6 +291,7 @@ export class GameController {
 
     /** Handles logic when a sentence is successfully completed (Game/Sandbox Only). */
     _handleSentenceFinished() {
+        console.log(`[DEBUG GameController _handleSentenceFinished] Called. Mode: ${this.gameState.currentMode}, Status: ${this.gameState.status}`); // Added log
         // Only applicable for Game and Sandbox modes
         if (this.gameState.currentMode === AppMode.LOREM_IPSUM) {
             console.warn("_handleSentenceFinished called in LoremIpsum Mode. Ignoring.");
@@ -291,6 +301,7 @@ export class GameController {
         if (this.gameState.status === GameStatus.SHOWING_RESULTS || this.gameState.status === GameStatus.MENU) return;
 
         console.log("GameController: Sentence finished.");
+        console.log(`[DEBUG GameController _handleSentenceFinished] Stopping UI timer.`); // Added log
         this.callbacks.onUpdateUIStatsTimer(false); // Stop UI timer
 
         // Ensure timer is stopped and state is FINISHED before calculating scores
@@ -299,7 +310,9 @@ export class GameController {
         }
 
         // Calculate scores
+        console.log(`[DEBUG GameController _handleSentenceFinished] gameState BEFORE calculating scores:`, JSON.parse(JSON.stringify(this.gameState))); // Added log
         const scores = this.scoreCalculator.calculateScores(this.gameState);
+        console.log(`[DEBUG GameController _handleSentenceFinished] Scores received from calculator:`, JSON.parse(JSON.stringify(scores))); // Added log
 
         let unlockedNextLevelId = null;
         let hasNextLevelOption = false; // Renamed from hasNextLevel for clarity
@@ -322,12 +335,14 @@ export class GameController {
 
         // Show results screen via UI Facade
         // Pass AppMode.LOREM_IPSUM here, but facade should handle skipping results for it
+        console.log(`[DEBUG GameController _handleSentenceFinished] Calling uiFacade.showResultsScreen with: scores, unlockedId=${unlockedNextLevelId}, hasNext=${hasNextLevelOption}, mode=${this.gameState.currentMode}, keys=${JSON.stringify(currentKeys)}`); // Added log
         this.uiFacade.showResultsScreen(scores, unlockedNextLevelId, hasNextLevelOption, this.gameState.currentMode, currentKeys);
         this.gameState.status = GameStatus.SHOWING_RESULTS; // Update state *after* showing screen
     }
 
     /** Restarts the current level or sandbox sentence. LoremIpsum mode does not retry. */
     retryCurrent() {
+        console.log(`[DEBUG GameController retryCurrent] Called. Mode: ${this.gameState.currentMode}`); // Added log
         if (this.gameState.currentMode === AppMode.LOREM_IPSUM) {
              console.log("GameController: Retry requested in LoremIpsum mode. Returning to menu.");
              this.callbacks.onGameEndShowMainMenu();
@@ -350,6 +365,7 @@ export class GameController {
 
     /** Proceeds to the next sentence or level (Game), or goes to menu (Sandbox/LoremIpsum). */
     proceedToNext() {
+         console.log(`[DEBUG GameController proceedToNext] Called. Mode: ${this.gameState.currentMode}`); // Added log
          // Handle proceeding from Sandbox or LoremIpsum mode -> Main Menu
          if (this.gameState.currentMode === AppMode.SANDBOX || this.gameState.currentMode === AppMode.LOREM_IPSUM) {
               console.log(`GameController: Proceeding from ${this.gameState.currentMode} to Main Menu.`);
@@ -362,10 +378,10 @@ export class GameController {
             const next = this.levelManager.getNextSentence(this.gameState);
 
             if (next && this.levelManager.isLevelUnlocked(next.levelId)) {
-                console.log(`GameController: Moving to next: Level ${next.levelId}, Sentence ${next.sentenceIndex + 1}`);
+                console.log(`[DEBUG GameController proceedToNext] Proceeding to Level: ${next.levelId}, Sentence: ${next.sentenceIndex + 1}`); // Added log
                 this.startGameLevel(next.levelId, next.sentenceIndex);
             } else {
-                console.log("GameController: No next level/sentence available or unlocked, returning to level select.");
+                console.log("[DEBUG GameController proceedToNext] No valid/unlocked next level found. Calling onGameEndShowLevelSelect."); // Added log
                 this.callbacks.onGameEndShowLevelSelect();
             }
         } else {
