@@ -1,411 +1,506 @@
-// Dit-Dah-Dash_Refactored/src/js/game/gameController.js
+// Dit-Dah-Dash_Refactored/src/js/main.js
 
-import { GameStatus, AppMode } from '../core/appStatus.js';
-import { LoremIpsumGenerator } from './loremIpsumGenerator.js'; // Import renamed generator
+// Core Modules
+import { GameState } from './core/gameState.js';
+import { AppMode, GameStatus } from './core/appStatus.js'; // Import enums
+import { STORAGE_KEYS, KEYBINDING_DEFAULTS, DEFAULT_WPM } from './core/configConstants.js'; // Import constants
+
+// Data & Config
+// import { LEVELS_DATA } from './data/levelsData.js'; // Not directly needed here
+import { LoremIpsumGenerator } from './game/loremIpsumGenerator.js'; // Import LoremIpsumGenerator
+
+// Game Logic Modules
+import { MorseDecoder } from './game/morseDecoder.js';
+import { LevelManager } from './game/levelManager.js';
+import { ScoreCalculator } from './game/scoreCalculator.js';
+import { GameController } from './game/gameController.js';
+
+// Audio Modules
+import { AudioContextManager } from './audio/audioContextManager.js';
+import { TonePlayer } from './audio/tonePlayer.js';
+import { SequencePlayer } from './audio/sequencePlayer.js';
+
+// Input Modules
+import { InputHandler } from './input/inputHandler.js';
+import { KeyingLogic } from './input/keyingLogic.js';
+
+// UI Modules
+import { UIManagerFacade } from './ui/uiManagerFacade.js';
+import { Modal } from './ui/modalManager.js'; // Use the correct export name 'Modal'
+import { SettingsModal } from './ui/views/settingsModal.js';
+
+// Settings Module
+import { SettingsManager } from './settingsManager.js';
 
 /**
- * js/game/gameController.js
- * -------------------------
- * Controls the core game flow logic for Game, Sandbox, and LoremIpsum modes.
- * Manages starting levels/sentences/modes, processing decoded input,
- * handling correct/incorrect attempts, finishing sentences, dynamically adding words,
- * and results navigation.
+ * js/main.js
+ * ----------
+ * Entry point for the Dit-Dah-Dash application.
+ * Initializes modules, wires up dependencies and event callbacks,
+ * manages the main application lifecycle.
  */
 
-export class GameController {
-    /**
-     * @param {GameState} gameState
-     * @param {LevelManager} levelManager
-     * @param {ScoreCalculator} scoreCalculator
-     * @param {MorseDecoder} morseDecoder
-     * @param {TonePlayer} tonePlayer - Needed for feedback sounds.
-     * @param {UIManagerFacade} uiFacade - For updating the UI.
-     * @param {LoremIpsumGenerator} loremIpsumGenerator - For LoremIpsum mode. (Changed type)
-     * @param {object} callbacks - Callbacks for high-level actions.
-     * @param {function} callbacks.onGameEndShowMainMenu - Callback to navigate to main menu.
-     * @param {function} callbacks.onGameEndShowLevelSelect - Callback to navigate to level select.
-     * @param {function} callbacks.onUpdateUIStatsTimer - Callback to start/stop the UI timer.
-     * @param {function} callbacks.getCurrentKeyMappings - Callback to get current key mappings for results hints.
-     */
-    constructor(gameState, levelManager, scoreCalculator, morseDecoder, tonePlayer, uiFacade, loremIpsumGenerator, callbacks) {
-        // Verify dependencies
-        if (!gameState || !levelManager || !scoreCalculator || !morseDecoder || !tonePlayer || !uiFacade || !loremIpsumGenerator || !callbacks || // Changed generator name
-            typeof callbacks.onGameEndShowMainMenu !== 'function' ||
-            typeof callbacks.onGameEndShowLevelSelect !== 'function' ||
-            typeof callbacks.onUpdateUIStatsTimer !== 'function' ||
-            typeof callbacks.getCurrentKeyMappings !== 'function') {
-            throw new Error("GameController requires instances of gameState, levelManager, scoreCalculator, morseDecoder, tonePlayer, uiFacade, loremIpsumGenerator, and specific callbacks.");
+document.addEventListener('DOMContentLoaded', () => {
+    console.log("Dit-Dah-Dash Refactored Initializing...");
+
+    // --- History Tracking ---
+    // Simple stack to manage back navigation via ESC key
+    let navigationHistory = ['menu']; // Start at main menu
+
+    // --- Global State for Hint Peek ---
+    let hintStateBeforeCtrl = null; // Tracks original hint state before Ctrl press
+
+    // --- Instantiate Core Modules ---
+    const gameState = new GameState();
+    const morseDecoder = new MorseDecoder();
+    const levelManager = new LevelManager();
+    const scoreCalculator = new ScoreCalculator();
+    const loremIpsumGenerator = new LoremIpsumGenerator(); // Instantiate LoremIpsumGenerator
+
+    // --- Instantiate Audio Modules ---
+    const audioCtxManager = new AudioContextManager();
+    const tonePlayer = new TonePlayer(audioCtxManager);
+    const sequencePlayer = new SequencePlayer(audioCtxManager);
+
+    // --- Instantiate UI Modules ---
+    const uiFacade = new UIManagerFacade(morseDecoder);
+    const settingsModalUI = new SettingsModal(); // UI elements *inside* modal
+    let settingsModalManager = null; // Handles modal container visibility/drag
+
+    // --- Declare helper functions BEFORE they are needed by callbacks ---
+    let gameTimerIntervalId = null;
+    let lastUpdateTime = 0;
+
+    /** Pushes a new state onto the navigation history if it's different from the last. */
+    function pushHistory(state) {
+        if (navigationHistory.at(-1) !== state) {
+            navigationHistory.push(state);
+            // console.log("History Push:", navigationHistory); // Debug
         }
-
-        this.gameState = gameState;
-        this.levelManager = levelManager;
-        this.scoreCalculator = scoreCalculator;
-        this.morseDecoder = morseDecoder;
-        this.tonePlayer = tonePlayer;
-        this.uiFacade = uiFacade;
-        this.loremIpsumGenerator = loremIpsumGenerator; // Store generator instance
-        this.callbacks = callbacks;
-
-        // LoremIpsum mode config
-        this.loremIpsumInitialWordCount = 20;
-        this.loremIpsumWordsPerChunk = 20;
-        this.loremIpsumChunkTriggerCount = 10; // Add new chunk after completing this many words
-
-        console.log("GameController Initialized.");
     }
 
-    /** Starts a specific level and sentence index. */
-    startGameLevel(levelId, sentenceIndex = 0) {
-        console.log(`[DEBUG GameController startGameLevel] Called. Level: ${levelId}, SentenceIndex: ${sentenceIndex + 1}`); // Added log
-        const sentenceText = this.levelManager.getSpecificSentence(levelId, sentenceIndex);
-
-        if (sentenceText === null) {
-            console.error(`GameController: Cannot start level - Invalid levelId ${levelId} or sentenceIndex ${sentenceIndex}.`);
-            this.callbacks.onGameEndShowMainMenu(); // Navigate away safely
-            return;
-        }
-
-        // Prepare game state
-        this.gameState.startLevelSentence(levelId, sentenceIndex, sentenceText);
-        console.log(`[DEBUG GameController startGameLevel] gameState after startLevelSentence:`, JSON.parse(JSON.stringify(this.gameState))); // Added log
-        this._commonStartGameUI(sentenceText); // Use common UI setup
+    /** Starts the UI timer interval to update stats display. */
+    function startGameUpdateTimer() {
+        if (gameTimerIntervalId) return; // Already running
+        const gameScreen = uiFacade.getGameScreen();
+        if (!gameScreen) return;
+        // console.log("Starting UI Update Timer..."); // Debug
+        lastUpdateTime = performance.now();
+        gameTimerIntervalId = setInterval(() => {
+            const now = performance.now();
+            // Update timer based on gameState's tracking
+            gameScreen.updateTimer(gameState.getCurrentElapsedTime());
+            // Note: WPM/Accuracy calculation for live update is complex.
+            // For now, we only update the timer display.
+            // Actual WPM/Acc are calculated at the end (Game/Sandbox).
+            lastUpdateTime = now;
+        }, 100); // Update UI ~10 times/sec
     }
 
-    /** Starts the sandbox mode with a given sentence. */
-    startSandboxPractice(sentenceText) {
-        console.log(`[DEBUG GameController startSandboxPractice] Called. Text: "${sentenceText}"`); // Added log
-        if (!sentenceText || !sentenceText.trim()) {
-            alert("Please enter a sentence for Sandbox mode.");
-            return; // Or navigate back?
+    /** Stops the UI timer interval. */
+    function stopGameUpdateTimer() {
+        if (gameTimerIntervalId) {
+            // console.log("Stopping UI Update Timer..."); // Debug
+            clearInterval(gameTimerIntervalId);
+            gameTimerIntervalId = null;
         }
-
-        // Prepare game state
-        this.gameState.startSandboxSentence(sentenceText);
-        console.log(`[DEBUG GameController startSandboxPractice] gameState after startSandboxSentence:`, JSON.parse(JSON.stringify(this.gameState))); // Added log
-        this._commonStartGameUI(sentenceText); // Use common UI setup
     }
 
-    /** Starts the LoremIpsum mode. (Renamed from startEndlessMode) */
-    startLoremIpsumMode() {
-        console.log(`[DEBUG GameController startLoremIpsumMode] Called.`); // Added log
-        this.loremIpsumGenerator.reset(); // Ensure generator starts from beginning
-        const initialWords = this.loremIpsumGenerator.generateWords(this.loremIpsumInitialWordCount);
-        if (!initialWords || initialWords.length === 0) {
-            console.error("GameController: Failed to generate initial words for LoremIpsum Mode.");
-            alert("Error starting LoremIpsum Mode. Could not generate words.");
-            this.callbacks.onGameEndShowMainMenu();
-            return;
-        }
-
-        // Prepare game state
-        this.gameState.startLoremIpsumMode(initialWords); // Renamed method in GameState
-        console.log(`[DEBUG GameController startLoremIpsumMode] gameState after startLoremIpsumMode:`, JSON.parse(JSON.stringify(this.gameState))); // Added log
-        this._commonStartGameUI(this.gameState.currentSentence); // Use common UI setup with initial sentence
+    /** Navigates to the level selection screen. */
+    function navigateToLevelSelect() {
+        console.log("Main: Navigating to Level Select.");
+        stopGameUpdateTimer(); // Ensure timer is stopped before changing view
+        sequencePlayer.stopPlayback();
+        const levels = levelManager.getAllLevelsWithStatus();
+        uiFacade.showLevelSelectScreen(levels);
+        gameState.reset(); // Reset state for level select
+        gameState.currentMode = AppMode.GAME; // Set mode to GAME
+        gameState.status = GameStatus.LEVEL_SELECT;
+        pushHistory('levelSelect'); // Update history
     }
 
-    /**
-     * Common UI setup logic used by startGameLevel, startSandboxPractice, and startLoremIpsumMode.
-     * @param {string} sentenceText - The text to display initially.
-     * @private
-     */
-    _commonStartGameUI(sentenceText) {
-        console.log(`[DEBUG GameController _commonStartGameUI] Called. Sentence: "${sentenceText}"`); // Added log
-        this.uiFacade.showGameScreen();
-        const gameScreen = this.uiFacade.getGameScreen();
-        if (gameScreen) {
-            gameScreen.renderSentence(sentenceText);
-            gameScreen.resetStatsAndPatterns(); // Reset timer display, patterns etc.
+    /** Navigates to the Sandbox setup screen. */
+    function navigateToSandboxSetup() {
+        stopGameUpdateTimer();
+        sequencePlayer.stopPlayback();
+        gameState.reset(); // Reset state for sandbox
+        gameState.currentMode = AppMode.SANDBOX;
+        gameState.status = GameStatus.SANDBOX_INPUT;
+        uiFacade.showSandboxScreen();
+        pushHistory('sandbox'); // Update history
+    }
 
-            const firstCharIndex = this.gameState.currentCharIndex;
-            const firstChar = this.gameState.getTargetCharacterRaw();
+     /** Navigates to the Playback setup screen. */
+    function navigateToPlaybackSetup() {
+        stopGameUpdateTimer();
+        sequencePlayer.stopPlayback();
+        gameState.reset(); // Reset state for playback
+        gameState.currentMode = AppMode.PLAYBACK;
+        gameState.status = GameStatus.PLAYBACK_INPUT;
+        uiFacade.showPlaybackScreen();
+        pushHistory('playback'); // Update history
+    }
 
-            if (firstChar !== null) {
-                 // Highlight first char, update target pattern, potentially start hint pulse
-                 gameScreen.highlightCharacter(firstCharIndex, firstChar);
-            } else if (sentenceText.trim().length === 0){
-                console.warn("GameController: Starting level/mode with empty or whitespace-only sentence.");
-                // Immediately finish if sentence is effectively empty (for Game/Sandbox)
-                if (this.gameState.currentMode !== AppMode.LOREM_IPSUM) {
-                    this.gameState.status = GameStatus.FINISHED; // Mark as finished without timer
-                    this._handleSentenceFinished();
-                    return;
-                } else {
-                    // Handle empty start in LoremIpsum? Should not happen with generator.
-                    console.error("LoremIpsum mode started with no initial words somehow.");
-                    this.callbacks.onGameEndShowMainMenu();
-                    return;
-                }
-            } else {
-                 console.error("GameController: Could not get first character even though sentence is not empty.");
-                 gameScreen.updateTargetPatternDisplay(""); // Clear target pattern
-            }
+    /** Navigates to LoremIpsum Mode screen. (Renamed from navigateToEndlessMode) */
+    function navigateToLoremIpsumMode() {
+        console.log("Main: Navigating to LoremIpsum Mode.");
+        stopGameUpdateTimer();
+        sequencePlayer.stopPlayback();
+        gameState.reset(); // Reset state before starting loremipsum
+        settingsManager.applySettings(); // Ensure current settings are applied
+        audioCtxManager.initializeContext(); // Ensure audio is ready
+        gameController.startLoremIpsumMode(); // Renamed GameController method handles state setup and UI call
+        pushHistory('loremIpsum'); // Update history (using 'loremIpsum' as state)
+    }
+
+     /** Navigates to the Game/Sandbox/LoremIpsum screen (called after level/sentence is chosen). */
+     function navigateToGameScreen() {
+         // Called by gameController.startGameLevel, startSandboxPractice, or startLoremIpsumMode
+         uiFacade.showGameScreen();
+         // History is pushed based on the mode set by the gameController methods
+         switch (gameState.currentMode) {
+             case AppMode.GAME: pushHistory('game'); break;
+             case AppMode.SANDBOX: pushHistory('sandboxPractice'); break;
+             case AppMode.LOREM_IPSUM: pushHistory('loremIpsumPractice'); break; // Use a distinct history state
+         }
+     }
+
+     /** Shows the main menu screen and resets relevant state/history. */
+     function showMainMenuScreen() {
+         stopGameUpdateTimer();
+         sequencePlayer.stopPlayback(); // Stop any playback
+         tonePlayer.stopInputTone(); // Stop any lingering input tone
+         tonePlayer.stopFeedbackSounds(); // Stop feedback sounds
+         gameState.reset(); // Full reset for main menu
+         gameState.currentMode = AppMode.MENU;
+         gameState.status = GameStatus.MENU;
+         uiFacade.showMainMenu();
+         // Reset history to only contain 'menu'
+         navigationHistory = ['menu'];
+         // console.log("History Reset:", navigationHistory); // Debug
+     }
+
+    /** Handles Dit/Dah input on the results screen. */
+    function handleResultsInput(type) { // type is 'dit' or 'dah'
+        if (gameState.status !== GameStatus.SHOWING_RESULTS) return;
+
+        if (type === 'dit') { // Retry
+            console.log("Main: Results Retry selected.");
+            gameController.retryCurrent(); // Handles Game/Sandbox retry (LoremIpsum doesn't show results)
+        } else if (type === 'dah') { // Next
+            // Check if 'Next' is actually enabled (handled by GameController)
+            console.log("Main: Results Next selected.");
+            gameController.proceedToNext(); // Handles Game next, or exit for Sandbox (LoremIpsum exits)
+        }
+    }
+
+    /** Plays the Morse sequence for the text in the playback input field. */
+    function playSentenceFromInput() {
+        const sentence = uiFacade.getPlaybackScreen()?.getSentence();
+        const playbackScreen = uiFacade.getPlaybackScreen();
+        if (!playbackScreen || !sentence) {
+             if(playbackScreen) playbackScreen.updateMorseDisplay("Please enter text.");
+             return;
+        }
+        if (sequencePlayer.isCurrentlyPlayingBack) {
+             sequencePlayer.stopPlayback();
+             if(playbackScreen) playbackScreen.setPlayButtonState(true, 'Play Morse');
         } else {
-             console.error("GameController: Could not get GameScreen instance from UI Facade.");
-        }
-
-        console.log(`[DEBUG GameController _commonStartGameUI] Resetting stats/patterns and stopping UI timer.`); // Added log
-        this.callbacks.onUpdateUIStatsTimer(false); // Stop any previous timer
-        console.log(`GameController: ${this.gameState.currentMode} ready.`);
-    }
-
-
-     /**
-     * Processes the completed Morse sequence entered by the user.
-     * Called by KeyingLogic after decode timeout.
-     */
-     handleCharacterDecode() {
-        const sequence = this.gameState.currentInputSequence; // Get sequence *before* clearing
-        console.log(`[DEBUG GameController handleCharacterDecode] Called. Status: ${this.gameState.status}, Sequence: '${sequence}'`); // Added log
-
-         // Ensure we are in a state where decoding makes sense
-         if (this.gameState.status !== GameStatus.DECODING || !(this.gameState.isPlaying())) { // isPlaying covers GAME/SANDBOX/LOREM_IPSUM
-            console.warn("GameController: handleCharacterDecode called in unexpected state/mode:", this.gameState.status, this.gameState.currentMode);
-            if (this.gameState.status === GameStatus.DECODING) this.gameState.status = GameStatus.LISTENING;
-            return;
-         }
-
-         const targetChar = this.gameState.getTargetCharacter(); // Uppercase target
-
-         // Clear the input sequence in game state (UI update handled separately)
-         const currentIndex = this.gameState.currentCharIndex; // Store index before clearing input
-         this.gameState.clearCurrentInput(); // This also sets state to LISTENING if playing
-         const gameScreen = this.uiFacade.getGameScreen();
-         if(gameScreen) {
-            gameScreen.updateUserPatternDisplay(""); // Clear UI pattern
-         }
-
-         // Handle empty input (timeout without typing anything)
-         if (!sequence) {
-             if (targetChar !== null && gameScreen) {
-                 const targetMorse = this.morseDecoder.encodeCharacter(targetChar);
-                 gameScreen.updateTargetPatternDisplay(targetMorse ?? ""); // Restore hint
+             const morseSequence = morseDecoder.encodeSentence(sentence);
+             if(playbackScreen) playbackScreen.updateMorseDisplay(morseSequence || '(No valid Morse)');
+             if (morseSequence) {
+                 settingsManager.applySettings(); // Ensure WPM/freq are current
+                 audioCtxManager.initializeContext(); // Ensure context is active
+                 if(playbackScreen) playbackScreen.setPlayButtonState(false, 'Playing...');
+                 sequencePlayer.playMorseSequence(morseSequence, () => {
+                     // Completion callback
+                     if(playbackScreen) playbackScreen.setPlayButtonState(true, 'Play Morse');
+                     gameState.status = GameStatus.PLAYBACK_INPUT; // Ready for new input
+                 });
+                 gameState.status = GameStatus.PLAYING_BACK;
              }
-              if(gameScreen) gameScreen.setPatternDisplayState('default'); // Ensure no lingering feedback
-             this.gameState.status = GameStatus.LISTENING; // Ensure listening state
-             return;
+        }
+    }
+
+    /** Updates the Morse preview in the sandbox screen based on input. */
+    function updateSandboxPreview() {
+        const sandboxScreen = uiFacade.getSandboxScreen();
+        if (sandboxScreen) {
+            const sentence = sandboxScreen.getSentence();
+            const morsePreview = morseDecoder.encodeSentence(sentence);
+            sandboxScreen.updateMorsePreview(morsePreview || '\u00A0'); // Show nbsp if empty
+        }
+    }
+
+    /** Resets saved progress (high scores, unlocked levels). */
+    function resetProgress() {
+         if (confirm("Are you sure you want to reset all your progress? This cannot be undone.")) {
+             levelManager.resetProgress();
+             // No need to close modal here, but might want to update level select if it's open
+             console.log("Progress reset.");
+             // Optional: Update settings modal display if defaults changed keys/wpm
+             settingsModalUI.updateDisplayValues(settingsManager.getSettings());
          }
+    }
 
-        // Decode the sequence
-        const decodedChar = this.morseDecoder.decodeSequence(sequence);
+    /** Called when the settings modal is opened. */
+    function handleShowSettings() {
+        console.log("Settings modal opened.");
+        gameState.status = GameStatus.SETTINGS; // Update status
+        // Optional: Pause game if running? Depends on desired behaviour.
+        settingsModalUI.updateDisplayValues(settingsManager.getSettings()); // Ensure UI matches state
+    }
 
-        // --- Compare Decoded Character with Target ---
-        if (decodedChar && targetChar && decodedChar === targetChar) {
-            // --- CORRECT ---
-            console.log(`[DEBUG GameController handleCharacterDecode] CORRECT. Decoded: ${decodedChar}, Target: ${targetChar}`); // Added log
-            if(gameScreen) {
-                gameScreen.updateCharacterState(currentIndex, 'completed');
-                gameScreen.setPatternDisplayState('correct'); // Green flash pattern
-            }
-
-            const moreChars = this.gameState.moveToNextCharacter(); // Advances index, sets state, checks word completion
-
-            if (moreChars) {
-                 // Check if we need more words in LoremIpsum mode
-                 if (this.gameState.currentMode === AppMode.LOREM_IPSUM) {
-                     this._checkAndAppendLoremIpsumWords(); // Renamed check function
-                 }
-
-                // Highlight the new character (or first char of new words)
-                 if(gameScreen) {
-                     const nextCharIndex = this.gameState.currentCharIndex;
-                     const nextCharRaw = this.gameState.getTargetCharacterRaw(); // Get raw char for hint encoding
-                     if (nextCharRaw !== null) { // Ensure there is a next char before highlighting
-                         gameScreen.highlightCharacter(nextCharIndex, nextCharRaw);
+    /** Called when the settings modal is closed. */
+    function handleHideSettings() {
+        console.log("Settings modal closed.");
+        // Revert status based on what was open before settings
+        const previousState = navigationHistory.at(-1); // Check last screen in history
+        switch(previousState) {
+            case 'game':
+            case 'sandboxPractice':
+            case 'loremIpsumPractice': // Added LoremIpsum practice check
+                 // If game was active, revert to LISTENING (or previous state).
+                 if (gameState.isPlaying() || gameState.status === GameStatus.READY) {
+                      gameState.status = GameStatus.LISTENING;
+                 } else if (gameState.status === GameStatus.FINISHED || gameState.status === GameStatus.SHOWING_RESULTS) {
+                     // LoremIpsum might be FINISHED but not showing results
+                     if (gameState.currentMode === AppMode.LOREM_IPSUM) {
+                          gameState.status = GameStatus.LISTENING; // Or MENU? Assuming exit on finish
                      } else {
-                         // This might happen temporarily in LoremIpsum if words run out before appending
-                         console.warn("GameController: No next character raw found after moveToNextCharacter.");
-                         // Game state should be LISTENING if we're waiting for words
+                          gameState.status = GameStatus.SHOWING_RESULTS;
                      }
+                 } else {
+                      gameState.status = GameStatus.LISTENING;
                  }
-            } else {
-                // --- SENTENCE FINISHED (Game/Sandbox Only) ---
-                if (this.gameState.currentMode !== AppMode.LOREM_IPSUM) {
-                    this._handleSentenceFinished();
-                }
-                 // Note: moveToNextCharacter handles the end-of-sentence logic differently for loremipsum mode
-            }
-        } else {
-            // --- INCORRECT ---
-            console.log(`[DEBUG GameController handleCharacterDecode] INCORRECT. Decoded: ${decodedChar ?? 'null'}, Target: ${targetChar}`); // Added log
-            this.gameState.registerIncorrectAttempt();
-            this.tonePlayer.playIncorrectSound(); // Play incorrect beep
-
-            if(gameScreen) {
-                gameScreen.updateCharacterState(currentIndex, 'incorrect'); // Red flash char
-                gameScreen.setPatternDisplayState('incorrect'); // Red flash pattern
-
-                // Restore hint for the current character
-                if (targetChar !== null) {
-                    const targetMorse = this.morseDecoder.encodeCharacter(targetChar);
-                    gameScreen.updateTargetPatternDisplay(targetMorse ?? "");
-                } else {
-                    gameScreen.updateTargetPatternDisplay(""); // Should not happen if targetChar exists
-                }
-            }
-            // Game state should be LISTENING after incorrect attempt (set by clearCurrentInput)
-            this.gameState.status = GameStatus.LISTENING;
+                 break;
+            case 'levelSelect': gameState.status = GameStatus.LEVEL_SELECT; break;
+            case 'sandbox': gameState.status = GameStatus.SANDBOX_INPUT; break;
+            case 'playback': gameState.status = GameStatus.PLAYBACK_INPUT; break;
+            case 'loremIpsum': gameState.status = GameStatus.MENU; break; // If settings opened from menu before starting LI
+            case 'menu':
+            default: gameState.status = GameStatus.MENU; break;
         }
     }
 
-    /**
-     * Checks if new words need to be generated and appended in LoremIpsum Mode.
-     * @private
-     */
-    _checkAndAppendLoremIpsumWords() { // Renamed function
-        console.log(`[DEBUG GameController _checkAndAppendLoremIpsumWords] Called. Mode: ${this.gameState.currentMode}, WordsCompletedInChunk: ${this.gameState.wordsCompletedInChunk}, TriggerCount: ${this.loremIpsumChunkTriggerCount}`); // Added log
-        if (this.gameState.currentMode !== AppMode.LOREM_IPSUM) return;
-
-        if (this.gameState.wordsCompletedInChunk >= this.loremIpsumChunkTriggerCount) {
-            console.log(`[DEBUG GameController _checkAndAppendLoremIpsumWords] Trigger count met. Generating ${this.loremIpsumWordsPerChunk} new words.`); // Added log
-            const newWords = this.loremIpsumGenerator.generateWords(this.loremIpsumWordsPerChunk);
-            if (newWords && newWords.length > 0) {
-                const success = this.gameState.appendLoremIpsumWords(newWords); // Renamed GameState method
-                if (success) {
-                    this.gameState.wordsCompletedInChunk = 0; // Reset chunk counter
-                    console.log(`[DEBUG GameController _checkAndAppendLoremIpsumWords] Successfully appended words. Reset chunk count to 0.`); // Added log
-                    // Update the UI to show the appended sentence
-                    const gameScreen = this.uiFacade.getGameScreen();
-                    if (gameScreen) {
-                         // Rerender the full sentence (simplest approach)
-                         // This might cause a flicker or reset scroll, could be optimized later
-                         gameScreen.renderSentence(this.gameState.currentSentence);
-                         // Re-highlight the current character after rerender
-                         const currentCharIndex = this.gameState.currentCharIndex;
-                         const currentCharRaw = this.gameState.getTargetCharacterRaw();
-                         if (currentCharRaw !== null) {
-                             gameScreen.highlightCharacter(currentCharIndex, currentCharRaw);
-                         } else {
-                             // If somehow index is out of bounds after append, log error
-                             console.error("LoremIpsum: Current character index out of bounds after appending words.");
-                         }
-                    }
-                } else {
-                    console.error("LoremIpsum: Failed to append new words to game state.");
-                }
-            } else {
-                console.error("LoremIpsum: Generator failed to return new words.");
-            }
-        }
-    }
-
-
-    /** Handles logic when a sentence is successfully completed (Game/Sandbox Only). */
-    _handleSentenceFinished() {
-        console.log(`[DEBUG GameController _handleSentenceFinished] Called. Mode: ${this.gameState.currentMode}, Status: ${this.gameState.status}`); // Added log
-        // Only applicable for Game and Sandbox modes
-        if (this.gameState.currentMode === AppMode.LOREM_IPSUM) {
-            console.warn("_handleSentenceFinished called in LoremIpsum Mode. Ignoring.");
+     /** Handles Control key press/release for hint peeking/hiding. */
+     function handleCtrlToggle(isPressed) {
+        // Only handle if game is active (any playable mode)
+        if (!gameState.isPlaying()) {
             return;
         }
-        // Prevent multiple finishes
-        if (this.gameState.status === GameStatus.SHOWING_RESULTS || this.gameState.status === GameStatus.MENU) return;
 
-        console.log("GameController: Sentence finished.");
-        console.log(`[DEBUG GameController _handleSentenceFinished] Stopping UI timer.`); // Added log
-        this.callbacks.onUpdateUIStatsTimer(false); // Stop UI timer
-
-        // Ensure timer is stopped and state is FINISHED before calculating scores
-        if (this.gameState.status !== GameStatus.FINISHED) {
-            this.gameState.stopTimer(); // Sets status to FINISHED if not already
-        }
-
-        // Calculate scores
-        console.log(`[DEBUG GameController _handleSentenceFinished] gameState BEFORE calculating scores:`, JSON.parse(JSON.stringify(this.gameState))); // Added log
-        const scores = this.scoreCalculator.calculateScores(this.gameState);
-        console.log(`[DEBUG GameController _handleSentenceFinished] Scores received from calculator:`, JSON.parse(JSON.stringify(scores))); // Added log
-
-        let unlockedNextLevelId = null;
-        let hasNextLevelOption = false; // Renamed from hasNextLevel for clarity
-
-        // Record score and check unlocks only in Game mode
-        if (this.gameState.currentMode === AppMode.GAME && this.gameState.currentLevelId !== null) {
-            const unlockResult = this.levelManager.recordScoreAndCheckUnlocks(this.gameState.currentLevelId, scores);
-            unlockedNextLevelId = unlockResult.unlockedNextLevelId;
-
-            // Check if there's a next sentence/level available AND unlocked
-            const nextSentenceDetails = this.levelManager.getNextSentence(this.gameState);
-            hasNextLevelOption = nextSentenceDetails !== null && this.levelManager.isLevelUnlocked(nextSentenceDetails.levelId);
-        } else {
-            // Sandbox mode has no next level option
-            hasNextLevelOption = false;
-        }
-
-        // Get current key mappings for results screen hints
-        const currentKeys = this.callbacks.getCurrentKeyMappings();
-
-        // Show results screen via UI Facade
-        // Pass AppMode.LOREM_IPSUM here, but facade should handle skipping results for it
-        console.log(`[DEBUG GameController _handleSentenceFinished] Calling uiFacade.showResultsScreen with: scores, unlockedId=${unlockedNextLevelId}, hasNext=${hasNextLevelOption}, mode=${this.gameState.currentMode}, keys=${JSON.stringify(currentKeys)}`); // Added log
-        this.uiFacade.showResultsScreen(scores, unlockedNextLevelId, hasNextLevelOption, this.gameState.currentMode, currentKeys);
-        this.gameState.status = GameStatus.SHOWING_RESULTS; // Update state *after* showing screen
-    }
-
-    /** Restarts the current level or sandbox sentence. LoremIpsum mode does not retry. */
-    retryCurrent() {
-        console.log(`[DEBUG GameController retryCurrent] Called. Mode: ${this.gameState.currentMode}`); // Added log
-        if (this.gameState.currentMode === AppMode.LOREM_IPSUM) {
-             console.log("GameController: Retry requested in LoremIpsum mode. Returning to menu.");
-             this.callbacks.onGameEndShowMainMenu();
-             return;
-        }
-
-        if (this.gameState.currentMode === AppMode.GAME && this.gameState.currentLevelId !== null && this.gameState.currentSentenceIndex !== null) {
-            console.log(`GameController: Retrying Level ${this.gameState.currentLevelId}, Sentence ${this.gameState.currentSentenceIndex + 1}`);
-            // Restart the same sentence
-            this.startGameLevel(this.gameState.currentLevelId, this.gameState.currentSentenceIndex);
-        } else if (this.gameState.currentMode === AppMode.SANDBOX && this.gameState.currentSentence) {
-            console.log("GameController: Retrying Sandbox sentence.");
-            // Restart sandbox with the same sentence stored in gameState
-            this.startSandboxPractice(this.gameState.currentSentence);
-        } else {
-            console.warn("GameController: Retry called in invalid state, returning to main menu.");
-            this.callbacks.onGameEndShowMainMenu();
-        }
-    }
-
-    /** Proceeds to the next sentence or level (Game), or goes to menu (Sandbox/LoremIpsum). */
-    proceedToNext() {
-         console.log(`[DEBUG GameController proceedToNext] Called. Mode: ${this.gameState.currentMode}`); // Added log
-         // Handle proceeding from Sandbox or LoremIpsum mode -> Main Menu
-         if (this.gameState.currentMode === AppMode.SANDBOX || this.gameState.currentMode === AppMode.LOREM_IPSUM) {
-              console.log(`GameController: Proceeding from ${this.gameState.currentMode} to Main Menu.`);
-              this.callbacks.onGameEndShowMainMenu();
-              return;
-         }
-
-         // Handle proceeding from Game mode
-         if (this.gameState.currentMode === AppMode.GAME && this.gameState.currentLevelId !== null) {
-            const next = this.levelManager.getNextSentence(this.gameState);
-
-            if (next && this.levelManager.isLevelUnlocked(next.levelId)) {
-                console.log(`[DEBUG GameController proceedToNext] Proceeding to Level: ${next.levelId}, Sentence: ${next.sentenceIndex + 1}`); // Added log
-                this.startGameLevel(next.levelId, next.sentenceIndex);
-            } else {
-                console.log("[DEBUG GameController proceedToNext] No valid/unlocked next level found. Calling onGameEndShowLevelSelect."); // Added log
-                this.callbacks.onGameEndShowLevelSelect();
+        if (isPressed) {
+            hintStateBeforeCtrl = settingsManager.getSettings().hintVisible;
+            if (!hintStateBeforeCtrl) {
+                settingsManager.setHintVisible(true);
             }
         } else {
-            console.warn("GameController: ProceedToNext called in invalid state, returning to main menu.");
-            this.callbacks.onGameEndShowMainMenu();
+            // Only revert if Ctrl was the reason hint was shown
+            if (hintStateBeforeCtrl === false) {
+                settingsManager.setHintVisible(false);
+            }
+            hintStateBeforeCtrl = null; // Reset stored state
         }
     }
 
-}
+    /** Navigates back one step in the application based on history. */
+    function navigateBack() {
+        console.log("Navigate Back triggered."); // Debug
 
-// Example Usage (in main.js):
-// import { GameController } from './game/gameController.js';
-// // Assuming gameState, levelManager, etc. instances exist
-// const gameController = new GameController(
-//     gameState, levelManager, scoreCalculator, morseDecoder, tonePlayer, uiFacade, loremIpsumGenerator, // Added loremIpsumGenerator
-//     {
-//          onGameEndShowMainMenu: () => { /* show main menu */ },
-//          onGameEndShowLevelSelect: () => { /* show level select */ },
-//          onUpdateUIStatsTimer: (start) => { /* start/stop interval */ },
-//          getCurrentKeyMappings: () => settingsManager.getKeyMappings() // Assuming settingsManager exists
-//     }
-// );
-// // When level selected: gameController.startGameLevel(levelId, 0);
-// // When LoremIpsum selected: gameController.startLoremIpsumMode(); // Renamed call
-// // When decode ready: gameController.handleCharacterDecode();
-// // When retry requested: gameController.retryCurrent();
-// // When next requested: gameController.proceedToNext();
+        // 1. Close settings modal if open
+        if (settingsModalManager && settingsModalManager.isOpen()) {
+            settingsModalManager.close();
+            return;
+        }
+
+        // 2. Handle specific back navigation from active game modes
+        if (gameState.isPlaying() || gameState.status === GameStatus.SHOWING_RESULTS) {
+             if (confirm("Exit current session and return to the main menu?")) {
+                 showMainMenuScreen(); // Exit active game/results directly to menu
+                 return;
+             } else {
+                 return; // User cancelled exit
+             }
+        }
+
+        // 3. Check history stack for other screens
+        if (navigationHistory.length <= 1) {
+            console.log("Navigate Back: Already at main menu.");
+            return; // Can't go back further than menu
+        }
+
+        // 4. Pop current state and get previous state
+        navigationHistory.pop();
+        const previousState = navigationHistory.at(-1);
+        // console.log("Navigate Back: Target State =", previousState, "History:", navigationHistory); // Debug
+
+        // 5. Navigate to the previous state (non-game screens)
+        switch (previousState) {
+            case 'levelSelect':
+                navigateToLevelSelect();
+                break;
+            case 'sandbox':
+                navigateToSandboxSetup();
+                break;
+            case 'playback':
+                navigateToPlaybackSetup();
+                break;
+            case 'loremIpsum': // Navigating back *from* loremipsum practice goes to menu
+                 showMainMenuScreen();
+                 break;
+            case 'menu':
+            default:
+                showMainMenuScreen(); // This resets history to ['menu']
+                break;
+        }
+    }
+
+
+    // --- Instantiate Game Controller ---
+    const gameController = new GameController(
+        gameState, levelManager, scoreCalculator, morseDecoder, tonePlayer, uiFacade,
+        loremIpsumGenerator, // Pass lorem ipsum generator
+         { // Callbacks for GameController
+             onGameEndShowMainMenu: showMainMenuScreen,
+             onGameEndShowLevelSelect: navigateToLevelSelect, // Use updated nav function
+             onUpdateUIStatsTimer: (start) => { if (start) startGameUpdateTimer(); else stopGameUpdateTimer(); },
+             getCurrentKeyMappings: () => settingsManager ? settingsManager.getKeyMappings() : KEYBINDING_DEFAULTS
+         }
+    );
+
+    // --- Load Initial Settings (BEFORE input handler needs them) ---
+     const initialSettings = {
+         ditKey: localStorage.getItem(STORAGE_KEYS.SETTINGS_DIT_KEY) || KEYBINDING_DEFAULTS.dit,
+         dahKey: localStorage.getItem(STORAGE_KEYS.SETTINGS_DAH_KEY) || KEYBINDING_DEFAULTS.dah,
+         wpm: parseInt(localStorage.getItem(STORAGE_KEYS.SETTINGS_WPM), 10) || DEFAULT_WPM
+     };
+     // Basic validation for keys loaded directly
+     if(initialSettings.ditKey === initialSettings.dahKey) {
+        console.warn("Loaded identical keys for Dit and Dah. Resetting Dah to default.");
+        initialSettings.dahKey = KEYBINDING_DEFAULTS.dah;
+        if(initialSettings.ditKey === initialSettings.dahKey) initialSettings.ditKey = KEYBINDING_DEFAULTS.dit;
+     }
+     if (isNaN(initialSettings.wpm) || initialSettings.wpm <= 0) {
+        initialSettings.wpm = DEFAULT_WPM;
+     }
+
+    // --- Instantiate Input Modules ---
+     const keyingLogicCallbacks = {
+         onInputStart: startGameUpdateTimer,
+         onCharacterDecode: () => gameController.handleCharacterDecode(),
+         onUpdateUserPattern: (sequence) => uiFacade.getGameScreen()?.updateUserPatternDisplay(sequence),
+         onResultsInput: handleResultsInput
+     };
+
+    const keyingLogic = new KeyingLogic(gameState, morseDecoder, tonePlayer, keyingLogicCallbacks);
+    keyingLogic.updateWpm(initialSettings.wpm); // Set initial WPM
+
+     const inputHandler = new InputHandler(
+        { // InputHandler Callbacks -> KeyingLogic + Ctrl Toggle
+            onDitPress: (method) => keyingLogic.handlePress('dit', method),
+            onDahPress: (method) => keyingLogic.handlePress('dah', method),
+            onDitRelease: (method) => keyingLogic.handleRelease('dit', method),
+            onDahRelease: (method) => keyingLogic.handleRelease('dah', method),
+            onCtrlToggle: handleCtrlToggle // Pass the new handler
+        },
+        { dit: initialSettings.ditKey, dah: initialSettings.dahKey } // Provide initial keys
+    );
+
+
+    // --- Instantiate Settings Manager ---
+    const settingsManager = new SettingsManager({
+        morseDecoder,
+        tonePlayer,
+        sequencePlayer,
+        inputHandler,
+        uiManagerFacade: uiFacade,
+        gameScreen: uiFacade.getGameScreen(),
+        audioCtxManager,
+        settingsModalUI
+    });
+    gameController.callbacks.getCurrentKeyMappings = () => settingsManager.getKeyMappings();
+
+
+    // --- Initialize Settings Modal Manager ---
+    const settingsModalTriggerButton = uiFacade.mainMenu?.showSettingsButton;
+    if (settingsModalTriggerButton) {
+         settingsModalManager = new Modal( // Use correct class name 'Modal'
+             'settings-modal',
+             settingsModalTriggerButton.id,
+             'settings-close-button',
+             'settings-modal-header',
+             handleShowSettings,
+             handleHideSettings
+         );
+         settingsModalUI.updateDisplayValues(settingsManager.getSettings());
+    } else {
+         console.error("Could not initialize Settings Modal Manager: Trigger button or ID not found.");
+    }
+
+
+    // --- Setup Callbacks Object for UI Facade ---
+     const uiCallbacks = {
+        onShowMainMenu: showMainMenuScreen,
+        onShowLevelSelect: navigateToLevelSelect,
+        onStartLoremIpsum: navigateToLoremIpsumMode, // Added LoremIpsum callback
+        onShowSandbox: navigateToSandboxSetup, // Use updated nav function
+        onShowPlayback: navigateToPlaybackSetup, // Use updated nav function
+        onLevelSelect: (levelId) => {
+             console.log(`Main: Level ${levelId} selected.`);
+             settingsManager.applySettings();
+             audioCtxManager.initializeContext();
+             gameController.startGameLevel(levelId, 0); // This internally calls navigateToGameScreen
+         },
+         onStartSandbox: () => {
+             const sentence = uiFacade.getSandboxScreen()?.getSentence();
+             if (sentence && sentence.trim()) {
+                  settingsManager.applySettings();
+                  audioCtxManager.initializeContext();
+                  gameController.startSandboxPractice(sentence); // This internally calls navigateToGameScreen
+             } else {
+                 alert("Please enter a sentence to practice.");
+             }
+         },
+         onPlaySentence: playSentenceFromInput,
+         onVolumeChange: (vol) => settingsManager.setVolume(vol),
+         onHintToggle: (visible) => settingsManager.setHintVisible(visible),
+         onSandboxInputChange: updateSandboxPreview,
+    };
+
+    // --- Wire Up Event Listeners ---
+    uiFacade.addEventListeners(uiCallbacks);
+    settingsModalUI.addEventListeners({
+         onWpmChange: (wpm) => settingsManager.setWpm(wpm),
+         onFrequencyChange: (freq) => settingsManager.setFrequency(freq),
+         onSoundToggle: (enabled) => settingsManager.setSoundEnabled(enabled),
+         onDarkModeToggle: (enabled) => settingsManager.setDarkModeEnabled(enabled),
+         onKeyMappingChange: (mappings) => settingsManager.setKeyMappings(mappings),
+         onResetProgress: resetProgress,
+         onResetSettings: handleResetSettings // Connect reset settings button
+     });
+
+    // Add global ESC key listener
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            navigateBack();
+        }
+    });
+
+    // --- Initial Application State ---
+    showMainMenuScreen(); // Show the main menu first
+    console.log("Dit-Dah-Dash Refactored Initialized.");
+
+    /** Resets configurable settings to defaults. */
+    function handleResetSettings() {
+        if (confirm("Reset all appearance and input settings (WPM, keys, volume, theme, paddle textures, etc.) to their defaults? Game progress will not be affected.")) {
+            console.log("Resetting settings to defaults...");
+            settingsManager.resetToDefaults(); // Resets core settings & applies them
+            uiFacade.getPaddleControls()?.resetPaddleTextures(); // Reset paddle textures
+
+            // Crucially, update the modal UI itself to show the new defaults
+            settingsModalUI.updateDisplayValues(settingsManager.getSettings());
+            console.log("Settings reset complete.");
+        }
+    }
+}); // End DOMContentLoaded

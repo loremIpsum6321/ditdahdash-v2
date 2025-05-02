@@ -202,7 +202,7 @@ export class KeyingLogic {
 
     /** Central logic to determine input mode (gameplay only) and manage timers/state. Called on press/release and after tone end. */
     _processInputStateChange() {
-        console.log(`[DEBUG KeyingLogic _processInputStateChange] Called. DitActive: ${this.ditActive}, DahActive: ${this.dahActive}, Status: ${this.gameState.status}, isPlaying: ${this.gameState.isPlaying()}`); // Added log
+        console.log(`[DEBUG KeyingLogic _processInputStateChange] Called. DitActive: ${this.ditActive}, DahActive: ${this.dahActive}, Status: ${this.gameState.status}, isPlaying: ${this.gameState.isPlaying()}, StartTime: ${this.gameState.startTime}`); // Added log + startTime
         const status = this.gameState.status;
         // Check if playing game/sandbox/endless
         const isGameInputContext = this.gameState.isPlaying(); // Checks READY, LISTENING, TYPING, DECODING
@@ -223,19 +223,22 @@ export class KeyingLogic {
 
         this._clearRepeatOrIambicTimer(); // Always clear timer before evaluating state
 
-        // If starting first input during READY state
-        if (status === GameStatus.READY && (isDitActive || isDahActive)) {
-             console.log("[DEBUG KeyingLogic _processInputStateChange] First input detected in READY state."); // Added log
-             if (this.gameState.startTimer()) { // Sets status to LISTENING
+        // --- *** FIX START *** ---
+        // If starting first input during READY or LISTENING state and timer hasn't started yet
+        if ((status === GameStatus.READY || status === GameStatus.LISTENING) && this.gameState.startTime === 0 && (isDitActive || isDahActive)) { // <-- Modified condition
+             console.log(`[DEBUG KeyingLogic _processInputStateChange] First input detected (Status: ${status}, startTime: ${this.gameState.startTime}). Starting timer.`); // Modified log
+             if (this.gameState.startTimer()) { // Sets status to LISTENING if it was READY
                  console.log("[DEBUG KeyingLogic _processInputStateChange] gameState.startTimer() succeeded. Calling onInputStart callback."); // Added log
                  this.callbacks.onInputStart(); // Notify main logic to start UI timer etc.
              } else {
-                 console.warn("[DEBUG KeyingLogic _processInputStateChange] gameState.startTimer() failed (already started?)."); // Added log
+                 // This could happen if status is LISTENING but startTime somehow got set elsewhere, though unlikely now.
+                 console.warn("[DEBUG KeyingLogic _processInputStateChange] gameState.startTimer() failed (maybe state issue?)."); // Modified log
              }
-             // Immediately transition to typing on first press
+             // Immediately transition to typing on first input
              this.gameState.status = GameStatus.TYPING;
              console.log(`[DEBUG KeyingLogic _processInputStateChange] Status set to TYPING.`); // Added log
         }
+        // --- *** FIX END *** ---
 
         // Determine Iambic state or single key press
         if (isDitActive && isDahActive) {
