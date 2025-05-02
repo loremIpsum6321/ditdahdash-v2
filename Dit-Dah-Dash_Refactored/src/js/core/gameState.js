@@ -6,7 +6,7 @@ import { GameStatus, AppMode } from './appStatus.js';
  * js/core/gameState.js
  * ---------------
  * Manages the state of the application, including game progress, playback state,
- * timing, current input, and mode (Game, Sandbox, Playback, Menu, Settings, Endless).
+ * timing, current input, and mode (Game, Sandbox, Playback, Menu, Settings, LoremIpsum).
  * Imports status and mode enums from appStatus.js.
  */
 
@@ -25,11 +25,11 @@ export class GameState {
         this.status = GameStatus.IDLE; // Start as idle, main.js will set to MENU
         this.currentMode = AppMode.MENU; // Track the mode
 
-        // --- Game/Sandbox/Endless-specific state ---
-        this.currentLevelId = null;     // null in sandbox/endless mode
-        this.currentSentenceIndex = 0;  // 0 in sandbox/endless mode
-        this.currentSentence = "";      // The text being typed (can be appended to in Endless)
-        this.totalCharsInSentence = 0;  // Total non-space characters (updated dynamically in Endless)
+        // --- Game/Sandbox/LoremIpsum-specific state ---
+        this.currentLevelId = null;     // null in sandbox/loremipsum mode
+        this.currentSentenceIndex = 0;  // 0 in sandbox/loremipsum mode
+        this.currentSentence = "";      // The text being typed (can be appended to in LoremIpsum)
+        this.totalCharsInSentence = 0;  // Total non-space characters (updated dynamically in LoremIpsum)
         this.currentCharIndex = 0;
         this.startTime = 0;
         this.endTime = 0;
@@ -46,9 +46,9 @@ export class GameState {
         this.isIambicHandling = false;
         this.iambicState = null; // 'dit' or 'dah'
 
-        // --- Endless Mode State ---
-        this.wordsCompletedCount = 0;    // Total words completed in Endless mode
-        this.currentWordChunk = [];      // Array of words currently being typed in Endless
+        // --- LoremIpsum Mode State ---
+        this.wordsCompletedCount = 0;    // Total words completed in LoremIpsum mode
+        this.currentWordChunk = [];      // Array of words currently being typed in LoremIpsum
         this.wordsCompletedInChunk = 0;  // Words completed since last word generation
 
         console.log("Application state reset.");
@@ -75,7 +75,7 @@ export class GameState {
         this.currentInputSequence = "";
         this.inputTimestamps = []; this.lastInputTime = 0; this.characterTimeoutId = null;
         this.isIambicHandling = false; this.iambicState = null;
-        this.wordsCompletedCount = 0; this.currentWordChunk = []; this.wordsCompletedInChunk = 0; // Reset endless state
+        this.wordsCompletedCount = 0; this.currentWordChunk = []; this.wordsCompletedInChunk = 0; // Reset loremipsum state
 
         this._skipLeadingSpaces();
         this.status = GameStatus.READY; // Set state after setup
@@ -99,7 +99,7 @@ export class GameState {
         this.currentInputSequence = "";
         this.inputTimestamps = []; this.lastInputTime = 0; this.characterTimeoutId = null;
         this.isIambicHandling = false; this.iambicState = null;
-        this.wordsCompletedCount = 0; this.currentWordChunk = []; this.wordsCompletedInChunk = 0; // Reset endless state
+        this.wordsCompletedCount = 0; this.currentWordChunk = []; this.wordsCompletedInChunk = 0; // Reset loremipsum state
 
         this._skipLeadingSpaces();
         this.status = GameStatus.READY; // Set state after setup
@@ -107,11 +107,11 @@ export class GameState {
     }
 
     /**
-     * Sets up the game state for ENDLESS mode.
+     * Sets up the game state for LOREM_IPSUM mode.
      * @param {Array<string>} initialWords - The first batch of words.
      */
-    startEndlessMode(initialWords) {
-        this.currentMode = AppMode.ENDLESS;
+    startLoremIpsumMode(initialWords) {
+        this.currentMode = AppMode.LOREM_IPSUM;
         this.currentLevelId = null;
         this.currentSentenceIndex = 0;
         this.currentSentence = initialWords.join(' '); // Start with initial words
@@ -123,14 +123,14 @@ export class GameState {
         this.inputTimestamps = []; this.lastInputTime = 0; this.characterTimeoutId = null;
         this.isIambicHandling = false; this.iambicState = null;
 
-        // Endless specific state
+        // LoremIpsum specific state
         this.wordsCompletedCount = 0;
         this.currentWordChunk = [...initialWords]; // Store the current words
         this.wordsCompletedInChunk = 0;
 
         this._skipLeadingSpaces();
         this.status = GameStatus.READY;
-        console.log(`Starting Endless Mode. Mode: ${this.currentMode}, Status: ${this.status}`);
+        console.log(`Starting LoremIpsum Mode. Mode: ${this.currentMode}, Status: ${this.status}`);
     }
 
     /** Skips leading spaces in the current sentence. */
@@ -140,7 +140,7 @@ export class GameState {
         }
     }
 
-     /** Starts the game/sandbox/endless timer if status is READY. */
+     /** Starts the game/sandbox/loremipsum timer if status is READY. */
      startTimer() {
         if (this.status === GameStatus.READY) {
             this.startTime = performance.now();
@@ -152,11 +152,11 @@ export class GameState {
         return false;
      }
 
-    /** Stops the game/sandbox/endless timer and sets status to FINISHED. */
+    /** Stops the game/sandbox/loremipsum timer and sets status to FINISHED. */
     stopTimer() {
-        // In Endless mode, the timer doesn't stop normally, only on exit.
-        if (this.currentMode === AppMode.ENDLESS) {
-            console.log("Timer stop requested in Endless Mode - typically only happens on exit.");
+        // In LoremIpsum mode, the timer doesn't stop normally, only on exit.
+        if (this.currentMode === AppMode.LOREM_IPSUM) {
+            console.log("Timer stop requested in LoremIpsum Mode - typically only happens on exit.");
             this.status = GameStatus.FINISHED; // Or maybe MENU if exiting?
             this.endTime = performance.now();
             this.elapsedTime = this.endTime - this.startTime;
@@ -176,12 +176,12 @@ export class GameState {
         return false;
     }
 
-    /** Updates the game/sandbox/endless input sequence. */
+    /** Updates the game/sandbox/loremipsum input sequence. */
     addInput(input) {
         const now = performance.now();
         // Only count inputs if actually in a playing state
         if (this.isPlaying() || this.status === GameStatus.READY) { // Adjusted check for READY
-            this.totalInputs++; // Track game/sandbox/endless inputs
+            this.totalInputs++; // Track game/sandbox/loremipsum inputs
         }
         this.inputTimestamps.push({ input, time: now });
         this.lastInputTime = now;
@@ -201,7 +201,7 @@ export class GameState {
         // Note: Logic for results screen input removed as per refactor goals.
     }
 
-    /** Clears the current game/sandbox/endless input sequence. */
+    /** Clears the current game/sandbox/loremipsum input sequence. */
     clearCurrentInput() {
         // console.log(`Clearing input sequence. Was: '${this.currentInputSequence}'`); // Debug
         this.currentInputSequence = "";
@@ -230,8 +230,8 @@ export class GameState {
     }
 
     /**
-     * Advances to the next game/sandbox/endless character.
-     * Handles word completion checks for Endless mode.
+     * Advances to the next game/sandbox/loremipsum character.
+     * Handles word completion checks for LoremIpsum mode.
      * Returns true if more chars exist, false if sentence complete (Game/Sandbox only).
      */
     moveToNextCharacter() {
@@ -241,12 +241,12 @@ export class GameState {
         this.correctChars++;
         this.currentCharIndex++;
 
-        // --- Word Completion Check (Endless Mode) ---
+        // --- Word Completion Check (LoremIpsum Mode) ---
         // Check if the completed character was a space
-        if (this.currentMode === AppMode.ENDLESS && previousChar === ' ') {
+        if (this.currentMode === AppMode.LOREM_IPSUM && previousChar === ' ') {
             this.wordsCompletedInChunk++;
             this.wordsCompletedCount++;
-            console.log(`Endless: Word completed. Chunk: ${this.wordsCompletedInChunk}, Total: ${this.wordsCompletedCount}`);
+            console.log(`LoremIpsum: Word completed. Chunk: ${this.wordsCompletedInChunk}, Total: ${this.wordsCompletedCount}`);
             // Trigger word generation check (logic handled in GameController)
             // This function only tracks completion.
         }
@@ -260,17 +260,17 @@ export class GameState {
 
         // Check if end of sentence reached
         if (this.currentCharIndex >= this.currentSentence.length) {
-            // In Endless mode, this means we need more words (handled by GameController)
+            // In LoremIpsum mode, this means we need more words (handled by GameController)
             // In Game/Sandbox, this signals the end.
             if (this.currentMode === AppMode.GAME || this.currentMode === AppMode.SANDBOX) {
                 this.stopTimer(); // Sets status to FINISHED
                 console.log("Sentence finished!");
                 return false; // No more characters (for Game/Sandbox)
             } else {
-                 // In Endless mode, reaching the end doesn't stop the timer or mark as finished.
+                 // In LoremIpsum mode, reaching the end doesn't stop the timer or mark as finished.
                  // The GameController will handle adding more words.
                  // We still return true because the *mode* continues.
-                 console.log("Endless: Reached end of current sentence chunk.");
+                 console.log("LoremIpsum: Reached end of current sentence chunk.");
                  return true; // More characters expected (will be added)
             }
         } else {
@@ -280,29 +280,29 @@ export class GameState {
         }
     }
 
-    /** Appends new words to the sentence in Endless Mode. */
-    appendEndlessWords(newWords) {
-        if (this.currentMode !== AppMode.ENDLESS || !newWords || newWords.length === 0) {
+    /** Appends new words to the sentence in LoremIpsum Mode. */
+    appendLoremIpsumWords(newWords) {
+        if (this.currentMode !== AppMode.LOREM_IPSUM || !newWords || newWords.length === 0) {
             return false;
         }
         const newSentencePart = " " + newWords.join(' '); // Add space separator
         this.currentSentence += newSentencePart;
         this.totalCharsInSentence += newSentencePart.split('').filter(char => char !== ' ').length; // Update total chars
         this.currentWordChunk.push(...newWords); // Add to the internal chunk list (optional)
-        console.log(`Endless: Appended ${newWords.length} words.`);
+        console.log(`LoremIpsum: Appended ${newWords.length} words.`);
         return true;
     }
 
 
-    /** Records an incorrect game/sandbox/endless attempt. */
+    /** Records an incorrect game/sandbox/loremipsum attempt. */
     registerIncorrectAttempt() {
         this.incorrectAttempts++;
         console.log("Incorrect attempt registered. Total:", this.incorrectAttempts);
     }
 
-    /** Checks if the game is in an active playing state (input matters for game/sandbox/endless). */
+    /** Checks if the game is in an active playing state (input matters for game/sandbox/loremipsum). */
     isPlaying() {
-        return (this.currentMode === AppMode.GAME || this.currentMode === AppMode.SANDBOX || this.currentMode === AppMode.ENDLESS) &&
+        return (this.currentMode === AppMode.GAME || this.currentMode === AppMode.SANDBOX || this.currentMode === AppMode.LOREM_IPSUM) &&
                (this.status === GameStatus.READY ||
                 this.status === GameStatus.LISTENING ||
                 this.status === GameStatus.TYPING ||
@@ -314,7 +314,7 @@ export class GameState {
          return this.currentMode === AppMode.PLAYBACK && this.status === GameStatus.PLAYING_BACK;
      }
 
-    /** Gets the target game/sandbox/endless character (uppercase or space). */
+    /** Gets the target game/sandbox/loremipsum character (uppercase or space). */
     getTargetCharacter() {
         if (this.isPlaying() && this.currentCharIndex < this.currentSentence.length) {
              const char = this.currentSentence[this.currentCharIndex];
@@ -322,18 +322,18 @@ export class GameState {
         } return null;
     }
 
-     /** Gets the target game/sandbox/endless character (raw case). */
+     /** Gets the target game/sandbox/loremipsum character (raw case). */
      getTargetCharacterRaw() {
           if (this.isPlaying() && this.currentCharIndex < this.currentSentence.length) {
              return this.currentSentence[this.currentCharIndex];
          } return null;
      }
 
-    /** Gets the current calculated elapsed game/sandbox/endless time. */
+    /** Gets the current calculated elapsed game/sandbox/loremipsum time. */
     getCurrentElapsedTime() {
         if (this.startTime === 0) return 0;
-        // In Endless mode, only stopTimer called on exit, so always calculate current time
-        if (this.currentMode === AppMode.ENDLESS) {
+        // In LoremIpsum mode, only stopTimer called on exit, so always calculate current time
+        if (this.currentMode === AppMode.LOREM_IPSUM) {
              return performance.now() - this.startTime;
         }
         // Handle Game/Sandbox finish states

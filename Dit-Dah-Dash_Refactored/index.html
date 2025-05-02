@@ -85,7 +85,7 @@
             <div id="main-menu-overlay" class="overlay">
                 <h2>Dit-Dah-Dash</h2>
                 <button id="start-game-button">Start Game</button>
-                <button id="start-endless-button">Endless Mode</button> <button id="show-sandbox-button">Sandbox Mode</button>
+                <button id="start-lorem-ipsum-button">LoremIpsum Mode</button> <button id="show-sandbox-button">Sandbox Mode</button>
                 <button id="show-playback-button">Sentence Playback</button>
                 <button id="show-settings-button">Settings ⚙️</button>
             </div>
@@ -113,7 +113,9 @@
                     </div>
             </div>
 
-        </div> <div id="input-area" class="hidden">
+        </div>
+
+        <div id="input-area" class="hidden">
             <button id="dit-button" class="morse-button" data-paddle-type="dit">
                 <svg class="paddle-svg" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg"><circle cx="25" cy="25" r="15" /></svg>
                 <span class="paddle-label"></span>
@@ -159,12 +161,14 @@
             </div>
         </div>
 
-    </div> <script type="module" src="src/js/core/appStatus.js"></script>
+    </div>
+
+    <script type="module" src="src/js/core/appStatus.js"></script>
     <script type="module" src="src/js/core/configConstants.js"></script>
     <script type="module" src="src/js/core/gameState.js"></script>
 
     <script type="module" src="src/js/data/levelsData.js"></script>
-    <script type="module" src="src/js/game/wordGenerator.js"></script> <script type="module" src="src/js/game/morseDecoder.js"></script>
+    <script type="module" src="src/js/game/loremIpsumGenerator.js"></script> <script type="module" src="src/js/game/morseDecoder.js"></script>
     <script type="module" src="src/js/game/scoreCalculator.js"></script>
     <script type="module" src="src/js/game/levelManager.js"></script>
     <script type="module" src="src/js/audio/audioContextManager.js"></script>
@@ -173,7 +177,6 @@
 
     <script type="module" src="src/js/ui/domUtils.js"></script>
     <script type="module" src="src/js/ui/modalManager.js"></script>
-
     <script type="module" src="src/js/ui/views/mainMenu.js"></script>
     <script type="module" src="src/js/ui/views/gameScreen.js"></script>
     <script type="module" src="src/js/ui/views/paddleControls.js"></script>
@@ -182,15 +185,10 @@
     <script type="module" src="src/js/ui/views/playbackScreen.js"></script>
     <script type="module" src="src/js/ui/views/sandboxScreen.js"></script>
     <script type="module" src="src/js/ui/views/settingsModal.js"></script>
-
-    <script type="module" src="src/js/ui/uiManagerFacade.js"></script>
-
-    <script type="module" src="src/js/input/inputHandler.js"></script>
+    <script type="module" src="src/js/ui/uiManagerFacade.js"></script> <script type="module" src="src/js/input/inputHandler.js"></script>
     <script type="module" src="src/js/settingsManager.js"></script>
 
     <script type="module" src="src/js/input/keyingLogic.js"></script>
     <script type="module" src="src/js/game/gameController.js"></script>
-
-    <script type="module" src="src/js/main.js"></script>
-</body>
+    <script type="module" src="src/js/main.js"></script> </body>
 </html>

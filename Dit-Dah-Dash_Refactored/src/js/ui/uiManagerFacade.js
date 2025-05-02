@@ -8,6 +8,8 @@ import { PlaybackScreen } from './views/playbackScreen.js';
 import { SandboxScreen } from './views/sandboxScreen.js';
 import { LevelSelectScreen } from './views/levelSelect.js';
 import { ResultsScreen } from './views/resultsScreen.js';
+import { AppMode } from '../core/appStatus.js'; // Import AppMode
+
 // Note: SettingsModal UI elements are managed by its own class,
 // but the modal container visibility is handled by ModalManager.
 
@@ -84,7 +86,7 @@ export class UIManagerFacade {
         console.log("UI Facade: Showing Main Menu");
     }
 
-    /** Shows the main game screen UI, used for Game, Sandbox, and Endless modes. */
+    /** Shows the main game screen UI, used for Game, Sandbox, and LoremIpsum modes. */
     showGameScreen() {
         this._hideAllViews();
         this.gameScreen.show();
@@ -92,7 +94,7 @@ export class UIManagerFacade {
         this._setInputAreaVisibility(true); // Show paddles for game
         this.activeView = this.gameScreen;
         // Log specific mode later when setting up listeners/state
-        console.log("UI Facade: Showing Game Screen (for Game/Sandbox/Endless)");
+        console.log("UI Facade: Showing Game Screen (for Game/Sandbox/LoremIpsum)");
     }
 
     showPlaybackScreen() {
@@ -126,19 +128,19 @@ export class UIManagerFacade {
 
     /**
      * Shows the results screen, populates it, and configures paddles.
-     * Note: Results screen is typically NOT shown for Endless mode.
+     * Note: Results screen is typically NOT shown for LoremIpsum mode.
      * @param {object} scores - Calculated scores.
      * @param {number | null} unlockedLevelId - ID of unlocked level, if any.
      * @param {boolean} hasNextLevelOption - If 'Next' option is valid.
-     * @param {AppMode} mode - Game mode (GAME/SANDBOX).
+     * @param {AppMode} mode - Game mode (GAME/SANDBOX/LOREM_IPSUM).
      * @param {object} keyMappings - Current key mappings for hints.
      */
     showResultsScreen(scores, unlockedLevelId, hasNextLevelOption, mode, keyMappings) {
-        // Do not show results for Endless mode
-        if (mode === AppMode.ENDLESS) {
-             console.log("UI Facade: Skipping results screen for Endless mode.");
+        // Do not show results for LoremIpsum mode
+        if (mode === AppMode.LOREM_IPSUM) {
+             console.log("UI Facade: Skipping results screen for LoremIpsum mode.");
              // Potentially navigate somewhere else, like main menu? Or just stay?
-             // For now, we assume the GameController handles the flow for Endless.
+             // For now, we assume the GameController handles the flow for LoremIpsum.
              return;
         }
 
@@ -167,12 +169,24 @@ export class UIManagerFacade {
     getPaddleControls() { return this.paddleControls; }
     getPlaybackScreen() { return this.playbackScreen; }
     getSandboxScreen() { return this.sandboxScreen; }
+    getMainMenu() { return this.mainMenu; } // Added getter for main menu
     // ... add others if needed
 
      /**
       * Adds event listeners by delegating to the appropriate view modules.
       * This centralizes listener setup after all modules are instantiated.
       * @param {object} callbacks - A comprehensive object containing all necessary callbacks for all views.
+      * @param {function} callbacks.onShowMainMenu
+      * @param {function} callbacks.onShowLevelSelect
+      * @param {function} callbacks.onStartLoremIpsum - Renamed from onStartEndless
+      * @param {function} callbacks.onShowSandbox
+      * @param {function} callbacks.onShowPlayback
+      * @param {function} callbacks.onLevelSelect
+      * @param {function} callbacks.onStartSandbox
+      * @param {function} callbacks.onPlaySentence
+      * @param {function} callbacks.onVolumeChange
+      * @param {function} callbacks.onHintToggle
+      * @param {function} callbacks.onSandboxInputChange
       */
      addEventListeners(callbacks) {
          if (!callbacks) {
@@ -183,7 +197,7 @@ export class UIManagerFacade {
          // Call addEventListeners on each view module, passing relevant callbacks
          this.mainMenu.addEventListeners({
              onShowLevelSelect: callbacks.onShowLevelSelect,
-             onStartEndless: callbacks.onStartEndless, // Added Endless callback
+             onStartLoremIpsum: callbacks.onStartLoremIpsum, // Use renamed callback
              onShowSandbox: callbacks.onShowSandbox,
              onShowPlayback: callbacks.onShowPlayback,
              // onShowSettings handled by ModalManager instance setup in main.js
@@ -234,7 +248,7 @@ export class UIManagerFacade {
 // // Setup all callbacks needed by ANY view module
 // const uiCallbacks = {
 //      onShowLevelSelect: () => { /* show level select logic */ },
-//      onStartEndless: () => { /* start endless mode logic */ }, // Add callback
+//      onStartLoremIpsum: () => { /* start lorem ipsum mode logic */ }, // Renamed callback
 //      onShowSandbox: () => { /* show sandbox logic */ },
 //      // ... all other callbacks ...
 //      onShowMainMenu: () => uiFacade.showMainMenu(),

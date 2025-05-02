@@ -7,7 +7,7 @@ import { STORAGE_KEYS, KEYBINDING_DEFAULTS, DEFAULT_WPM } from './core/configCon
 
 // Data & Config
 // import { LEVELS_DATA } from './data/levelsData.js'; // Not directly needed here
-import { WordGenerator } from './game/wordGenerator.js'; // Import WordGenerator
+import { LoremIpsumGenerator } from './game/loremIpsumGenerator.js'; // Import LoremIpsumGenerator
 
 // Game Logic Modules
 import { MorseDecoder } from './game/morseDecoder.js';
@@ -55,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const morseDecoder = new MorseDecoder();
     const levelManager = new LevelManager();
     const scoreCalculator = new ScoreCalculator();
-    const wordGenerator = new WordGenerator(); // Instantiate WordGenerator
+    const loremIpsumGenerator = new LoremIpsumGenerator(); // Instantiate LoremIpsumGenerator
 
     // --- Instantiate Audio Modules ---
     const audioCtxManager = new AudioContextManager();
@@ -109,8 +109,11 @@ document.addEventListener('DOMContentLoaded', () => {
     /** Navigates to the level selection screen. */
     function navigateToLevelSelect() {
         console.log("Main: Navigating to Level Select.");
+        stopGameUpdateTimer(); // Ensure timer is stopped before changing view
+        sequencePlayer.stopPlayback();
         const levels = levelManager.getAllLevelsWithStatus();
         uiFacade.showLevelSelectScreen(levels);
+        gameState.reset(); // Reset state for level select
         gameState.currentMode = AppMode.GAME; // Set mode to GAME
         gameState.status = GameStatus.LEVEL_SELECT;
         pushHistory('levelSelect'); // Update history
@@ -138,27 +141,27 @@ document.addEventListener('DOMContentLoaded', () => {
         pushHistory('playback'); // Update history
     }
 
-    /** Navigates to Endless Mode screen. */
-    function navigateToEndlessMode() {
-        console.log("Main: Navigating to Endless Mode.");
+    /** Navigates to LoremIpsum Mode screen. (Renamed from navigateToEndlessMode) */
+    function navigateToLoremIpsumMode() {
+        console.log("Main: Navigating to LoremIpsum Mode.");
         stopGameUpdateTimer();
         sequencePlayer.stopPlayback();
-        gameState.reset(); // Reset state before starting endless
+        gameState.reset(); // Reset state before starting loremipsum
         settingsManager.applySettings(); // Ensure current settings are applied
         audioCtxManager.initializeContext(); // Ensure audio is ready
-        gameController.startEndlessMode(); // GameController handles state setup and UI call
-        pushHistory('endless'); // Update history
+        gameController.startLoremIpsumMode(); // Renamed GameController method handles state setup and UI call
+        pushHistory('loremIpsum'); // Update history (using 'loremIpsum' as state)
     }
 
-     /** Navigates to the Game/Sandbox/Endless screen (called after level/sentence is chosen). */
+     /** Navigates to the Game/Sandbox/LoremIpsum screen (called after level/sentence is chosen). */
      function navigateToGameScreen() {
-         // Called by gameController.startGameLevel, startSandboxPractice, or startEndlessMode
+         // Called by gameController.startGameLevel, startSandboxPractice, or startLoremIpsumMode
          uiFacade.showGameScreen();
          // History is pushed based on the mode set by the gameController methods
          switch (gameState.currentMode) {
              case AppMode.GAME: pushHistory('game'); break;
              case AppMode.SANDBOX: pushHistory('sandboxPractice'); break;
-             case AppMode.ENDLESS: pushHistory('endlessPractice'); break; // Use a distinct history state?
+             case AppMode.LOREM_IPSUM: pushHistory('loremIpsumPractice'); break; // Use a distinct history state
          }
      }
 
@@ -183,11 +186,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (type === 'dit') { // Retry
             console.log("Main: Results Retry selected.");
-            gameController.retryCurrent(); // Handles Game/Sandbox retry
+            gameController.retryCurrent(); // Handles Game/Sandbox retry (LoremIpsum doesn't show results)
         } else if (type === 'dah') { // Next
             // Check if 'Next' is actually enabled (handled by GameController)
             console.log("Main: Results Next selected.");
-            gameController.proceedToNext(); // Handles Game next, or exit for Sandbox
+            gameController.proceedToNext(); // Handles Game next, or exit for Sandbox (LoremIpsum exits)
         }
     }
 
@@ -256,13 +259,17 @@ document.addEventListener('DOMContentLoaded', () => {
         switch(previousState) {
             case 'game':
             case 'sandboxPractice':
-            case 'endless': // Added Endless check
-            case 'endlessPractice':
+            case 'loremIpsumPractice': // Added LoremIpsum practice check
                  // If game was active, revert to LISTENING (or previous state).
                  if (gameState.isPlaying() || gameState.status === GameStatus.READY) {
                       gameState.status = GameStatus.LISTENING;
                  } else if (gameState.status === GameStatus.FINISHED || gameState.status === GameStatus.SHOWING_RESULTS) {
-                     gameState.status = GameStatus.SHOWING_RESULTS;
+                     // LoremIpsum might be FINISHED but not showing results
+                     if (gameState.currentMode === AppMode.LOREM_IPSUM) {
+                          gameState.status = GameStatus.LISTENING; // Or MENU? Assuming exit on finish
+                     } else {
+                          gameState.status = GameStatus.SHOWING_RESULTS;
+                     }
                  } else {
                       gameState.status = GameStatus.LISTENING;
                  }
@@ -270,6 +277,7 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'levelSelect': gameState.status = GameStatus.LEVEL_SELECT; break;
             case 'sandbox': gameState.status = GameStatus.SANDBOX_INPUT; break;
             case 'playback': gameState.status = GameStatus.PLAYBACK_INPUT; break;
+            case 'loremIpsum': gameState.status = GameStatus.MENU; break; // If settings opened from menu before starting LI
             case 'menu':
             default: gameState.status = GameStatus.MENU; break;
         }
@@ -288,7 +296,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 settingsManager.setHintVisible(true);
             }
         } else {
-            settingsManager.setHintVisible(false);
+            // Only revert if Ctrl was the reason hint was shown
+            if (hintStateBeforeCtrl === false) {
+                settingsManager.setHintVisible(false);
+            }
             hintStateBeforeCtrl = null; // Reset stored state
         }
     }
@@ -335,7 +346,7 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'playback':
                 navigateToPlaybackSetup();
                 break;
-            case 'endless': // Navigating back *from* endless practice goes to menu
+            case 'loremIpsum': // Navigating back *from* loremipsum practice goes to menu
                  showMainMenuScreen();
                  break;
             case 'menu':
@@ -349,7 +360,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Instantiate Game Controller ---
     const gameController = new GameController(
         gameState, levelManager, scoreCalculator, morseDecoder, tonePlayer, uiFacade,
-        wordGenerator, // Pass word generator
+        loremIpsumGenerator, // Pass lorem ipsum generator
          { // Callbacks for GameController
              onGameEndShowMainMenu: showMainMenuScreen,
              onGameEndShowLevelSelect: navigateToLevelSelect, // Use updated nav function
@@ -432,7 +443,7 @@ document.addEventListener('DOMContentLoaded', () => {
      const uiCallbacks = {
         onShowMainMenu: showMainMenuScreen,
         onShowLevelSelect: navigateToLevelSelect,
-        onStartEndless: navigateToEndlessMode, // Added Endless callback
+        onStartLoremIpsum: navigateToLoremIpsumMode, // Added LoremIpsum callback
         onShowSandbox: navigateToSandboxSetup, // Use updated nav function
         onShowPlayback: navigateToPlaybackSetup, // Use updated nav function
         onLevelSelect: (levelId) => {

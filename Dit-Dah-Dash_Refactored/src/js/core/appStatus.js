@@ -8,12 +8,12 @@ export const GameStatus = Object.freeze({
     MENU: 'menu',                   // Main menu is actively displayed
     SETTINGS: 'settings',           // Settings modal is open
     LEVEL_SELECT: 'level_select',   // Level selection screen is active
-    READY: 'ready',                 // Sentence loaded (game/sandbox/endless), waiting for first input
-    LISTENING: 'listening',         // Actively listening for first dit/dah (game/sandbox/endless)
-    TYPING: 'typing',               // Receiving dits/dahs for current character (game/sandbox/endless)
-    DECODING: 'decoding',           // Short pause after last input, deciding character (game/sandbox/endless)
-    FINISHED: 'finished',           // Sentence completed calculation phase (game/sandbox/endless)
-    SHOWING_RESULTS: 'showing_results', // Results screen is active (game/sandbox/endless) - Note: Endless might not show results
+    READY: 'ready',                 // Sentence loaded (game/sandbox/loremipsum), waiting for first input
+    LISTENING: 'listening',         // Actively listening for first dit/dah (game/sandbox/loremipsum)
+    TYPING: 'typing',               // Receiving dits/dahs for current character (game/sandbox/loremipsum)
+    DECODING: 'decoding',           // Short pause after last input, deciding character (game/sandbox/loremipsum)
+    FINISHED: 'finished',           // Sentence completed calculation phase (game/sandbox/loremipsum)
+    SHOWING_RESULTS: 'showing_results', // Results screen is active (game/sandbox) - Note: LoremIpsum might not show results
     PLAYBACK_INPUT: 'playback_input', // Playback screen is shown, waiting for input/play
     PLAYING_BACK: 'playing_back',     // Audio playback is active (playback)
     SANDBOX_INPUT: 'sandbox_input', // Sandbox setup screen is active
@@ -27,9 +27,10 @@ export const AppMode = Object.freeze({
     GAME: 'game',           // Standard level progression
     SANDBOX: 'sandbox',     // Custom sentence practice
     PLAYBACK: 'playback',   // Sentence audio playback tool
-    ENDLESS: 'endless'      // Endless word generation mode
+    LOREM_IPSUM: 'lorem_ipsum' // Lorem Ipsum word generation mode (Renamed from ENDLESS)
 });
 
 // Example of how other modules would import and use these:
 // import { GameStatus, AppMode } from './appStatus.js';
 // if (gameState.status === GameStatus.READY) { ... }
+// if (gameState.currentMode === AppMode.LOREM_IPSUM) { ... }
