@@ -39,23 +39,33 @@ export class MorseDecoder {
      * @param {number} wpm - The new Words Per Minute setting. Must be > 0.
      */
     updateWpm(wpm) {
-        if (wpm <= 0 || typeof wpm !== 'number') {
-            console.warn(`MorseDecoder: Invalid WPM value received: ${wpm}`);
-            return;
-        }
-        if (this.currentWpm === wpm) return; // No change needed
+        // Add logging to see the received WPM value
+        // console.log("MorseDecoder.updateWpm received:", wpm); // Optional Debug log
 
-        this.currentWpm = wpm;
+        let validWpm = wpm;
+        if (typeof wpm !== 'number' || isNaN(wpm) || wpm <= 0) {
+            console.warn(`MorseDecoder: Invalid WPM value received: ${wpm}. Falling back to DEFAULT_WPM (${DEFAULT_WPM}).`);
+            validWpm = DEFAULT_WPM; // Use default if invalid
+        }
+
+        // Avoid recalculation only if the *validated* WPM matches the current one
+        if (this.currentWpm === validWpm) return;
+
+        this.currentWpm = validWpm;
         // Formula: 1 WPM = 50 dit units per minute (PARIS standard)
         // Time per dit unit (ms) = (60 seconds * 1000 ms/sec) / (WPM * 50 units/min) = 1200 / WPM
-        this.ditDuration = 1200 / wpm; // ms per dit element
+        this.ditDuration = 1200 / this.currentWpm; // ms per dit element
 
         // Calculate the timeout threshold for detecting the end of a character input sequence.
         // This is based on the standard inter-character gap, potentially adjusted by a multiplier.
         const interCharGapDurationMs = this.ditDuration * INTER_CHARACTER_GAP_UNITS;
         this.interCharGapThreshold = interCharGapDurationMs * CHARACTER_INPUT_TIMEOUT_MULTIPLIER;
 
-        console.log(`Decoder timings updated for ${wpm} WPM: Dit=${this.ditDuration.toFixed(0)}ms, Decode Timeout >= ${this.interCharGapThreshold.toFixed(0)}ms`);
+        // Ensure the threshold is at least a minimal positive value (e.g., 1ms) as a safeguard,
+        // although with validWpm > 0, this shouldn't strictly be necessary.
+        this.interCharGapThreshold = Math.max(1, this.interCharGapThreshold);
+
+        console.log(`Decoder timings updated for ${this.currentWpm} WPM: Dit=${this.ditDuration.toFixed(0)}ms, Decode Timeout >= ${this.interCharGapThreshold.toFixed(0)}ms`);
     }
 
     /**
