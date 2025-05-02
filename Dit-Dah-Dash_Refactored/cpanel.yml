@@ -1,7 +1,0 @@
-deployment:
-  tasks:
-    - export DEPLOYPATH=/home/markzpwz/public_html/Dit-Dah-Dash/
-    # This is the line to check:
-    - /bin/rsync -av --delete --exclude '.git' --exclude '.cpanel.yml' ./Dit-Dah-Dash/ "${DEPLOYPATH}"
-    - find "${DEPLOYPATH}" -type d -exec chmod 755 {} \;
-    # - find "${DEPLOYPATH}" -type f -exec chmod 644 {} \; # Optional: Uncomment if needed
